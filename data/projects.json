@@ -227,7 +227,7 @@
       "Sustainability"
     ],
     "summary": "A beginner-friendly filament recycler that turns printing waste back into usable filament, from basic PLA to abrasive carbon blends.",
-    "why_md": "3D printing is great until you look at the pile of wasted plastic it leaves behind: failed prints, support material, leftover spools that can't be reused without the right gear. I want to flip that problem on its head. This concept is a beginner-friendly, low-maintenance filament recycler that works with any material, from basic PLA all the way to the abrasive carbon blends.",
+    "why_md": "3D printing is great until you look at the pile of wasted plastic it leaves behind: failed prints, support material, leftover spools that can't be reused without the right gear. I want to flip that problem on its head. This concept is a beginner-friendly, low-maintenance filament recycler that works with any material, from basic PLA all the way to abrasive carbon blends.",
     "how_md": "The plan is a rugged metal hopper that can take heavy use, feeding into a hardened shredder and then through a precisely heated extrusion system. The trick is keeping it simple enough for a maker to run without a manual, but robust enough to chew through different plastics without constant maintenance or pricey replacement parts.",
     "problems_md": "If it works, 3D-printing waste stops being trash and turns into a resource loop instead. That makes the whole process cheaper and a lot easier on the planet, whether you're a hobbyist printing on the weekend or running a shop full of machines.",
     "hero_image": "/assets/filament-recycler.svg",
