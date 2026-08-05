@@ -271,7 +271,7 @@ body.cursor-ready a, body.cursor-ready button { cursor: none; }
     gap: var(--s4);
 }
 
-.site-mark { display: inline-flex; align-items: center; line-height: 1; }
+.site-mark { display: inline-flex; align-items: center; line-height: 1.1; }
 .mark-name {
     font-family: var(--font-display);
     font-weight: 800;
@@ -952,6 +952,41 @@ a:focus-visible, button:focus-visible {
 .toast.err { background: var(--accent); }
 .uploading { display: inline-flex; align-items: center; gap: 0.5rem; font-family: var(--font-mono); font-size: 0.7rem; color: var(--muted); }
 .mini-spin { width: 14px; height: 14px; border: 2px solid var(--hairline); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+
+/* ----------------------------------------------------------------- *
+ * Mobile refinements
+ * ----------------------------------------------------------------- */
+/* no grey tap-flash on touch devices */
+a, button, .btn, .work-card, .index-row { -webkit-tap-highlight-color: transparent; }
+
+@media (max-width: 600px) {
+    :root { --gutter: 1.35rem; }
+
+    /* slightly finer blueprint grid reads cleaner on small screens */
+    body { background-size: 48px 48px; }
+
+    /* full-width, thumb-friendly call-to-action buttons */
+    .now-cta, .about-cta { flex-direction: column; align-items: stretch; }
+    .now-cta .btn, .about-cta .btn { width: 100%; justify-content: center; }
+    .btn { padding-block: 0.95rem; }
+
+    .hero-meta { margin-top: var(--s6); gap: var(--s5); }
+
+    /* give the index-row title room, keep the arrow snug */
+    .index-row { gap: var(--s4); }
+}
+
+/* very small phones: keep the big display type from overflowing */
+@media (max-width: 400px) {
+    .hero-title { font-size: clamp(2.35rem, 11.5vw, 3rem); letter-spacing: -0.03em; }
+    .page-title { font-size: clamp(2.3rem, 11vw, 3.2rem); }
+    .footer-mark { font-size: clamp(1.5rem, 8vw, 2rem); }
+}
+
+/* short landscape (phones held sideways): don't force a tall empty hero */
+@media (max-height: 520px) and (orientation: landscape) {
+    .hero { min-height: auto; padding-block: var(--s8); }
+}
 
 /* ----------------------------------------------------------------- *
  * Print

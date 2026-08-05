@@ -19,7 +19,7 @@
   {
     "slug": "valve-cover",
     "title": "ULPower Valve Cover",
-    "subtitle": "Reverse-engineered aircraft engine valve cover — Dassault Systèmes",
+    "subtitle": "Reverse-engineered aircraft engine valve cover, built at Dassault Systèmes",
     "status": "project",
     "tags": [
       "CAD",
@@ -27,9 +27,9 @@
       "Prototyping"
     ],
     "summary": "Reverse-engineered a missing ULPower aircraft engine valve cover from calipers and reference photos into a production-ready CAD model.",
-    "why_md": "While working on-site at Dassault Systèmes, I was tasked with recreating a missing ULPower aircraft engine valve cover. This wasn't a \"find a replacement\" job — buying one wasn't an option. It had to be reverse-engineered from scratch, using only measurements, reference images, and my ability to translate them into an accurate, manufacturable CAD model. This was more than just copying a part. It was about producing a file that could go straight into the prototyping and production pipeline without requiring additional modifications.",
-    "how_md": "Capturing the geometry required both precision and creativity. I used calipers to take every measurable dimension I could, then referenced photos to model the subtle curves, embossed lettering, and gasket sealing surfaces in CAD. Because this was for an aircraft engine, I had to account for real-world constraints like vibration, thermal expansion, and material removal during machining. I printed a prototype in PLA+ on my Ender 3 V2 Neo to verify the fit and alignment before handing off the final file for production.",
-    "problems_md": "The completed model matched the original in form, function, and tolerance requirements, making it ready for manufacturing. This project reinforced my ability to bridge physical measurements and digital modeling, while thinking ahead to how the part will perform in an operational environment. It also showed I can work under constraints and deliver a solution that meets both engineering and production standards.",
+    "why_md": "While I was working on-site at Dassault Systèmes, I got handed a missing ULPower aircraft engine valve cover and asked to bring it back. This wasn't a 'go buy a replacement' job; buying one simply wasn't an option. It had to be rebuilt from scratch using nothing but measurements, reference photos, and whatever I could translate into an accurate, manufacturable CAD model. And it wasn't enough to just copy the shape. The file had to be clean enough to drop straight into the prototyping and production pipeline without anyone touching it up.",
+    "how_md": "Capturing the geometry took a mix of precision and guesswork. I took every dimension I could reach with a set of calipers, then leaned on photos to model the subtle curves, the embossed lettering, and the gasket sealing surfaces. Because this was going on an aircraft engine, I had to keep real-world stuff in mind the whole time: vibration, thermal expansion, and how much material would come off during machining. Before I handed anything off, I printed a prototype in PLA+ on my Ender 3 V2 Neo to check that the fit and alignment were actually right.",
+    "problems_md": "The finished model matched the original in form, function, and tolerance, and it was ready to manufacture as-is. This one really drove home that I can bridge physical measurements and digital modeling while thinking a few steps ahead to how the part has to survive out in the real world. It also showed I can work inside tight constraints and still deliver something that holds up to both engineering and production standards.",
     "hero_image": "/assets/engine-cad.jpg",
     "gallery": [
       {
@@ -70,9 +70,9 @@
       "Assembly Design"
     ],
     "summary": "An FEA-driven monitor mount: 8 iterations to a factor of safety of 2–5 and under 0.3 mm displacement carrying a 7.1 kg display.",
-    "why_md": "I designed this monitor mount to support a 7.1 kg, 31.5-inch Acer monitor while keeping the ports easy to access. The concept started with a simple block that locked the monitor at 90 degrees, but I wanted the ability to swivel it up for convenience. From the start I knew PETG would be strong enough, so the challenge became finding the right balance between strength and efficiency by cutting weight where possible while maintaining a high factor of safety.",
-    "how_md": "My first simulation showed that a solid PETG block would easily handle the weight, so I began reducing material in controlled ways. Triangular supports set just three millimeters from the walls carried the load well, and additional cutouts only improved force distribution. To push the design, I ran a study with 100 newtons pushing from the top and another 100 newtons pulling through the hinge pin. The results came back mostly in blue and light green, showing plenty of safety margin, with only a small stress spot on one triangle. Instead of adding more infill, I simplified the geometry and added a triangle cutout behind the hinge hole, which increased strength without extra material. I was also concerned about twisting forces being too much for a single screw, so I added a second one and moved them apart to distribute the load. After several iterations I rethought the hinge placement and found a better position that gave me a cleaner load path.",
-    "problems_md": "After eight design iterations and many simulations the mount consistently showed a factor of safety between two and five. Maximum displacement was measured at only 0.3 millimeters for the wall piece and 0.02 millimeters for the screen mount, well within safe limits. The process reinforced my approach of **simplify then lighten**: remove unnecessary material, reinforce only where the data shows weakness, and trust the results. The final mount is efficient, reliable, and able to hold my monitor in place with confidence.",
+    "why_md": "I built this mount to hold a 7.1 kg, 31.5-inch Acer monitor while keeping the ports easy to get at. It started as a simple block that locked the monitor at 90 degrees, but I wanted to be able to swivel it up when I needed to. I knew from the start that PETG would be plenty strong, so the real challenge became the balance: how do I cut as much weight as I can and still keep a high factor of safety?",
+    "how_md": "My first simulation showed a solid PETG block would shrug off the weight, so I started pulling material out in controlled ways. Triangular supports set about three millimeters off the walls carried the load well, and the extra cutouts I added actually improved how the force spread out. To really lean on it, I ran a study with 100 newtons pushing from the top and another 100 newtons pulling through the hinge pin. Most of the results came back blue and light green, so I had plenty of margin, with just one small stress spot on a single triangle. Instead of dumping more infill in, I simplified the geometry and cut a triangle out behind the hinge hole, which made it stronger without adding a gram. I was also worried a single screw wouldn't hold up to the twisting force, so I added a second one and spread them apart to share the load. After a few more rounds I rethought where the hinge sat and found a spot that gave me a much cleaner load path.",
+    "problems_md": "After eight iterations and a lot of simulations, the mount held a factor of safety between two and five every time. Max displacement came out to 0.3 millimeters on the wall piece and 0.02 millimeters on the screen mount, well inside the safe zone. The whole thing reinforced how I like to work: **simplify, then lighten**. Pull out anything that isn't doing work, reinforce only where the data says it's weak, and trust what the numbers tell you. The final mount is light, reliable, and holds my monitor exactly where I want it.",
     "hero_image": "/assets/monitor-mount-1.jpg",
     "gallery": [
       {
@@ -120,10 +120,10 @@
       "Custom Enclosure",
       "3D Printing"
     ],
-    "summary": "A fully functional Linux laptop on a Raspberry Pi — five hinge iterations until the screen sat exactly right.",
-    "why_md": "This project began as part of a SolidWorks class, but I treated it like a real-world product from day one. I set out to design and build a fully functional Linux laptop powered by a Raspberry Pi, aiming for something practical, affordable, and portable that didn't feel like a rough prototype. I wanted an enclosure that looked clean, routed cables internally without tangles, and gave full access to every necessary port. This wasn't just about putting parts in a box — it was a complete system designed to work reliably while looking professional.",
-    "how_md": "Designing a laptop hinge became one of the toughest problems to solve. It took five different iterations before I found one that could hold the screen at multiple angles without wobble, while still folding smoothly when closed. Inside, I had to position the Pi, battery, and display in a way that prevented cable strain and kept all ports perfectly aligned with the enclosure openings. I took part in the majority of the CAD modeling and R&D, from the main body and lid geometry to optimize airflow to the mounting features and internal cable channels.",
-    "problems_md": "The final laptop was compact, boot-ready, and felt solid in hand. It proved I could own a project from concept to execution while balancing usability, manufacturability, and aesthetics. Beyond the hardware, it showed that I can combine CAD design, mechanical problem solving, and hands-on assembly into one cohesive build that works as well in practice as it does on paper.",
+    "summary": "A fully functional Linux laptop built on a Raspberry Pi, with five hinge iterations before the screen sat exactly right.",
+    "why_md": "This one started as a SolidWorks class project, but I treated it like a real product from day one. The goal was a fully working Linux laptop running on a Raspberry Pi, something practical, affordable, and portable that didn't feel like a rough prototype held together with hope. I wanted a clean enclosure that hid its cables inside, kept them from tangling, and still gave me access to every port I needed. It was never about cramming parts into a box; I wanted a whole system that worked reliably and actually looked the part.",
+    "how_md": "The hinge turned out to be the hardest problem in the whole build. It took five separate iterations before I got one that could hold the screen at different angles without wobbling and still fold shut smoothly. On the inside I had to lay out the Pi, the battery, and the display so nothing pulled on a cable and every port lined up with its opening in the enclosure. I did most of the CAD and R&D myself, from the main body and lid geometry (shaped to move air through it) down to the mounting features and the internal cable channels.",
+    "problems_md": "The finished laptop was compact, booted straight up, and felt solid in my hands. It proved to me that I can take a project from an idea all the way to a working object while juggling usability, manufacturability, and how it looks. More than that, it showed I can pull CAD, mechanical problem-solving, and hands-on assembly into one build that works as well on the desk as it does on paper.",
     "hero_image": "/assets/raspi-beauty-render.jpg",
     "gallery": [
       {
@@ -169,9 +169,9 @@
       "Air Filtration"
     ],
     "summary": "A compact carbon-filter fume extractor built for about $5 that outperformed commercial units at roughly 10× the price.",
-    "why_md": "I built this compact carbon-filter fume extractor to solve a real problem in my home workshop — poor ventilation when soldering. Commercial options at the low end were underpowered and overpriced, so I decided to design and build one myself using materials I already had. The goal was a unit that was small, efficient, and reliable, with thoughtful design choices that made it easy to maintain.",
-    "how_md": "The first design included a stand for adjustable angles, but testing proved the fan's airflow was strong enough to pull fumes from four inches away without repositioning. Removing the stand simplified the build and improved print orientation. Initially, I used a 12 V fan and a voltage booster, but repeated failures during testing (confirmed with multimeter readings) showed the setup was overstressing components. I switched to a 5 V USB-C fan that reduced electrical load, simplified wiring, and eliminated the problematic booster circuit entirely.",
-    "problems_md": "The finished extractor outperformed similar commercial units, cost me about five dollars to build, and could be serviced easily if needed. More importantly, it taught me how small design changes can have big performance impacts, and how to merge airflow efficiency, electronics troubleshooting, and structural design into a single, well-balanced product.",
+    "why_md": "I built this compact carbon-filter fume extractor to fix a real problem in my home workshop: bad ventilation every time I sat down to solder. The cheap commercial options were underpowered and still cost too much, so I figured I'd just design and build one out of stuff I already had lying around. I wanted it small, efficient, and reliable, with a few design choices that made it easy to keep clean.",
+    "how_md": "The first version had a stand so I could angle it, but testing showed the fan pulled fumes fine from four inches away without me repositioning anything, so the stand had to go. Dropping it simplified the build and made it print better too. I started with a 12 V fan and a voltage booster, but it kept failing on me during testing (the multimeter confirmed I was overstressing the parts), so I swapped in a 5 V USB-C fan. That cut the electrical load, cleaned up the wiring, and let me throw out the problematic booster circuit entirely.",
+    "problems_md": "The finished extractor beat the commercial units I compared it against, cost me about five dollars to build, and is easy to service if it ever needs it. The bigger takeaway for me was seeing how much a small design change can move performance, and getting comfortable blending airflow, electronics troubleshooting, and structure into one thing that actually balances.",
     "hero_image": "/assets/carbon-filter-main.jpg",
     "gallery": [
       {
@@ -206,10 +206,10 @@
       "Raspberry Pi",
       "3D Printing"
     ],
-    "summary": "A portable, single-purpose OctoPi enclosure — Pi, display, camera, and integrated cooling in one compact unit.",
-    "why_md": "I wanted a portable, dedicated station for running OctoPi so I could manage my 3D printer without tying up my main computer. Inspired by my Raspberry Pi laptop build, I reworked the concept for a single-purpose device optimized for printing control. The design needed to be compact, durable, and organized, keeping everything in one unit that could be moved around the workspace easily.",
-    "how_md": "I designed the enclosure to hold the Pi, a display, a camera module, and integrated cooling vents, all while keeping the footprint as small as possible. Cable routing was built directly into the design so everything stayed clean and tangle-free, making it easier to set up and service. The hinge mounts were reinforced so the lid could be opened and closed repeatedly without wearing out. Every mounting point, vent cutout, and cable channel was placed with a focus on reliability and ease of use.",
-    "problems_md": "The completed enclosure became a mobile printer control hub that streamlined my workflow and kept my setup organized. It showed I can adapt an existing design into a specialized, single-purpose tool that works better for its intended task while keeping build quality high and usability front and center.",
+    "summary": "A portable, single-purpose OctoPi enclosure that packs the Pi, a display, a camera, and cooling into one compact unit.",
+    "why_md": "I wanted a portable, dedicated station for running OctoPi so I could manage my 3D printer without tying up my main computer. My Raspberry Pi laptop gave me the starting point, so I reworked that idea into a single-purpose device built just for print control. It needed to be compact, tough, and organized, with everything living in one unit I could move around the workspace without a hassle.",
+    "how_md": "I designed the enclosure to hold the Pi, a display, a camera module, and cooling vents while keeping the footprint as small as I could get it. Cable routing went straight into the design so nothing tangled and setup or servicing stayed easy. I reinforced the hinge mounts so the lid could open and close over and over without wearing out. Every mounting point, vent, and cable channel got placed with reliability and ease of use in mind.",
+    "problems_md": "The finished enclosure turned into a mobile printer hub that cleaned up my whole workflow and kept my setup organized. It showed I can take an existing design and adapt it into a specialized tool that does its one job better, without letting build quality or usability slip.",
     "hero_image": null,
     "gallery": [],
     "stl_url": null,
@@ -226,10 +226,10 @@
       "3D Printing",
       "Sustainability"
     ],
-    "summary": "A beginner-friendly filament recycler that turns printing waste into usable filament — from PLA to abrasive carbon blends.",
-    "why_md": "3D printing is great until you see the pile of wasted plastic — failed prints, support material, leftover spools that can't be reused without the right gear. I want to flip that problem. This concept is a beginner-friendly, low-maintenance filament recycler that works for any material from basic PLA to abrasive carbon blends.",
-    "how_md": "I would design a rugged metal hopper that can handle heavy use, feed it into a hardened shredder, and push the material through a precisely heated extrusion system. The key is making it simple enough for makers to operate but robust enough to handle different plastics without constant maintenance or expensive replacements.",
-    "problems_md": "This would turn 3D-printing waste from a disposal problem into a resource loop, making additive manufacturing more sustainable and cost-effective for both hobbyists and production environments.",
+    "summary": "A beginner-friendly filament recycler that turns printing waste back into usable filament, from basic PLA to abrasive carbon blends.",
+    "why_md": "3D printing is great until you look at the pile of wasted plastic it leaves behind: failed prints, support material, leftover spools that can't be reused without the right gear. I want to flip that problem on its head. This concept is a beginner-friendly, low-maintenance filament recycler that works with any material, from basic PLA all the way to the abrasive carbon blends.",
+    "how_md": "The plan is a rugged metal hopper that can take heavy use, feeding into a hardened shredder and then through a precisely heated extrusion system. The trick is keeping it simple enough for a maker to run without a manual, but robust enough to chew through different plastics without constant maintenance or pricey replacement parts.",
+    "problems_md": "If it works, 3D-printing waste stops being trash and turns into a resource loop instead. That makes the whole process cheaper and a lot easier on the planet, whether you're a hobbyist printing on the weekend or running a shop full of machines.",
     "hero_image": "/assets/filament-recycler.svg",
     "gallery": [],
     "stl_url": "/assets/models/filament-recycler.glb",
@@ -248,9 +248,9 @@
       "Water"
     ],
     "summary": "An Arduino automation unit handling EC sensing, pH tracking, and nutrient dosing for hydroponics.",
-    "why_md": "Hydroponics lives and dies on precision. If your nutrient levels are off your plants either stall or burn. Manually checking EC and dosing nutrients gets old fast, especially when you have multiple systems running. My concept is an Arduino-based automation unit that handles it all — EC sensing, pH tracking, and nutrient dosing through a set of small pumps.",
-    "how_md": "The probes would be modular for easy swap-outs, and all electronics would sit in a sealed enclosure to survive high humidity. I want it to learn your system's patterns over time, adjusting dosing schedules based on plant growth stages and environmental changes. The goal is set-it-and-forget-it automation that actually improves crop yields.",
-    "problems_md": "This would make precision agriculture accessible to small-scale growers, reducing crop loss from nutrient imbalances while freeing up time for other critical farming tasks.",
+    "why_md": "Hydroponics lives and dies on precision. If your nutrient levels are off, your plants either stall out or burn. Checking EC and dosing nutrients by hand gets old fast, especially once you've got a few systems running at once. My concept is an Arduino-based unit that handles all of it: EC sensing, pH tracking, and nutrient dosing through a set of small pumps.",
+    "how_md": "The probes would be modular so they're easy to swap out, and all the electronics would sit in a sealed enclosure to survive the humidity. I want it to learn your system's rhythm over time and adjust its dosing based on where the plants are in their growth and what the environment is doing. The goal is real set-it-and-forget-it automation, the kind that actually pushes your yields up instead of just keeping things alive.",
+    "problems_md": "The whole point is to put precision growing within reach of small growers, cut the crop loss that comes from nutrient swings, and hand people back the time they'd otherwise spend babysitting probes.",
     "hero_image": "/assets/hydroponic-ec.svg",
     "gallery": [],
     "stl_url": null,
@@ -269,9 +269,9 @@
       "Safety Tech"
     ],
     "summary": "An AI-powered motorcycle helmet with hazard detection, predictive alerts, and a HUD in the rider's view.",
-    "why_md": "On a bike every second matters, sometimes less than a second. This helmet concept is about making those seconds count by turning passive protection into active prevention. It would integrate AI-powered hazard detection, predictive alerts, and a heads-up display directly into the rider's view.",
-    "how_md": "Using a network of small cameras and sensors it could track blind spots, monitor following distance, and highlight road hazards before they become a problem. The AI would learn your riding patterns and local road conditions, getting better at predicting dangerous situations the more you ride. All critical alerts would appear as subtle visual overlays that don't distract from the road.",
-    "problems_md": "This technology could significantly reduce motorcycle accidents by giving riders the situational awareness they need to avoid dangerous situations before they escalate.",
+    "why_md": "On a bike every second matters, sometimes a whole lot less than a second. This helmet concept is about making those seconds count by turning passive protection into active prevention. It would build AI hazard detection, predictive alerts, and a heads-up display right into the rider's line of sight.",
+    "how_md": "Using a set of small cameras and sensors, it could watch your blind spots, keep an eye on your following distance, and flag road hazards before they turn into a real problem. The AI would learn how you ride and what the local roads are like, getting sharper at calling out dangerous situations the more you ride. Anything critical would show up as a subtle overlay that doesn't pull your eyes off the road.",
+    "problems_md": "If it works the way I picture it, the helmet gives riders the extra bit of awareness they need to dodge a crash before it ever starts. On a bike that's the whole game, and it could save a lot of lives.",
     "hero_image": "/assets/ai-helmet.svg",
     "gallery": [],
     "stl_url": null,
@@ -290,9 +290,9 @@
       "Renewable Energy"
     ],
     "summary": "A coordinated swarm of worker drones that transport, position, and install solar panels with minimal human help.",
-    "why_md": "Building and maintaining solar farms, especially in remote areas, takes a lot of time and money. My concept is a coordinated swarm of AI-driven worker drones that can transport, position, and install solar panels with very little human help.",
-    "how_md": "Each drone would have a role — some for ground prep, others for carrying panels, and others for precision placement. A larger queen drone would act as a mobile base station with extra power and tools for the swarm. The idea is a self-deploying system that could set up solar installations in challenging terrain where traditional construction equipment can't operate efficiently.",
-    "problems_md": "This would dramatically reduce the cost and time required to deploy renewable energy infrastructure, making solar power viable in previously inaccessible locations.",
+    "why_md": "Building and maintaining solar farms takes a ton of time and money, and it only gets worse out in remote areas. My concept is a coordinated swarm of AI-driven worker drones that can haul, position, and install solar panels with barely any human help.",
+    "how_md": "Each drone would have a job: some prep the ground, some carry panels, and some handle the precise placement. A bigger queen drone would sit at the center as a mobile base station, carrying extra power and tools for the rest of the swarm. The idea is a system that deploys itself and can stand up an installation in rough terrain where normal construction equipment just can't work well.",
+    "problems_md": "Done right, this cuts down the time and money it takes to stand up a solar farm, and it makes clean power possible in places a construction crew can't easily get to.",
     "hero_image": "/assets/solar-drones.svg",
     "gallery": [],
     "stl_url": null,
@@ -311,9 +311,9 @@
       "Environmental Monitoring"
     ],
     "summary": "A low-cost, solar-powered sensor collecting CO₂, particulates, temperature, and humidity for a decentralized network.",
-    "why_md": "Most environmental monitoring is either low-tech and very local, or advanced and too expensive for wide use. My concept is a low-cost, solar-powered sensor that can run on its own while collecting high-value climate data.",
-    "how_md": "Each one would measure CO₂, particulate matter, temperature, humidity, and other pollutants, sending the data securely to a decentralized network. This would let communities, researchers, and policy makers see real-time environmental maps without relying on a small number of expensive monitoring stations.",
-    "problems_md": "Widespread deployment would create a comprehensive environmental monitoring network, providing critical data for climate research and public health initiatives at unprecedented scale and resolution.",
+    "why_md": "Most environmental monitoring is either cheap and stuck in one spot, or advanced and way too expensive to put everywhere. My concept sits in the middle: a low-cost, solar-powered sensor that runs on its own and still collects data worth having.",
+    "how_md": "Each one would read CO₂, particulate matter, temperature, humidity, and a handful of other pollutants, then send it all securely to a decentralized network. That would let communities, researchers, and policymakers watch real-time environmental maps instead of leaning on a small handful of expensive monitoring stations.",
+    "problems_md": "Put enough of these out there and you've got a live map of the environment, real data that people can actually act on instead of guessing from a few pricey stations scattered across a whole region.",
     "hero_image": "/assets/sentinel-sensor.svg",
     "gallery": [],
     "stl_url": null,

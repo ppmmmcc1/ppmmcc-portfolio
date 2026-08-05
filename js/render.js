@@ -45,7 +45,7 @@
                 .sort(function (a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
 
             if (!items.length) {
-                container.innerHTML = '<p class="state-msg">Nothing here yet — check back soon.</p>';
+                container.innerHTML = '<p class="state-msg">Nothing here yet, check back soon.</p>';
                 return;
             }
             container.classList.add('work-grid');
