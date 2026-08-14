@@ -8,8 +8,48 @@
         setupMobileMenu();
         setupImageErrorHandling();
         setupKeyboardShortcuts();
+        setupScrollCue();
         setYear();
     });
+
+    // Bottom-centre scroll cue: jumps to the end of the page and doubles as
+    // a "there's more below" indicator. Only present on the detail page.
+    function setupScrollCue() {
+        var cue = document.getElementById('scroll-cue');
+        if (!cue) { return; }
+        var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        cue.addEventListener('click', function () {
+            var y = document.documentElement.scrollHeight;
+            if (window.__lenis && window.__lenis.scrollTo) {
+                window.__lenis.scrollTo(y, { duration: reduce ? 0 : 1.1 });
+            } else {
+                window.scrollTo({ top: y, behavior: reduce ? 'auto' : 'smooth' });
+            }
+        });
+
+        function update() {
+            var scrolled = window.scrollY || document.documentElement.scrollTop || 0;
+            var viewport = window.innerHeight;
+            var full = document.documentElement.scrollHeight;
+            var atBottom = scrolled + viewport >= full - 120;   // close enough to the end
+            var tooShort = full - viewport < 240;               // nothing worth scrolling to
+            cue.classList.toggle('show', !atBottom && !tooShort);
+        }
+
+        cue.hidden = false;
+        update();
+        window.addEventListener('scroll', update, { passive: true });
+        window.addEventListener('resize', update);
+
+        // The detail page injects its content asynchronously (render.js), which
+        // changes the page height — re-check when it lands.
+        var article = document.getElementById('project-detail');
+        if (article && window.MutationObserver) {
+            new MutationObserver(update).observe(article, { childList: true, subtree: true });
+        }
+        setTimeout(update, 1000);
+    }
 
     // Mobile nav toggle
     function setupMobileMenu() {

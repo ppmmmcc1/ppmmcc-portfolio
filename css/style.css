@@ -661,6 +661,35 @@ body.menu-open .menu-toggle span:nth-child(3) { transform: translateY(-6.5px) ro
 .gallery img { width: 100%; transition: transform 600ms var(--ease-out); }
 @media (hover: hover) and (pointer: fine) { .gallery figure:hover img { transform: scale(1.03); } }
 
+/* scroll-to-bottom cue — red circle + white arrow, bottom-centre */
+.scroll-cue {
+    position: fixed; left: 50%; bottom: clamp(1rem, 4vh, 2rem);
+    width: 44px; height: 44px; display: grid; place-items: center;
+    border: none; border-radius: 50%;
+    background: var(--accent); color: #fff; cursor: pointer;
+    z-index: 90; padding: 0;
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--accent) 35%, transparent);
+    opacity: 0; pointer-events: none;
+    transform: translateX(-50%) translateY(8px);
+    transition: opacity 400ms var(--ease-out), transform 400ms var(--ease-out),
+                box-shadow 300ms var(--ease-out);
+    animation: scroll-cue-bob 1.8s var(--ease-out) infinite;
+}
+.scroll-cue.show { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+.scroll-cue[hidden] { display: none; }
+.scroll-cue svg { display: block; }
+@media (hover: hover) and (pointer: fine) {
+    .scroll-cue:hover { box-shadow: 0 8px 26px color-mix(in srgb, var(--accent) 55%, transparent); }
+}
+@keyframes scroll-cue-bob {
+    0%, 100% { margin-bottom: 0; }
+    50% { margin-bottom: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .scroll-cue { animation: none; transition: opacity 200ms linear; }
+    .scroll-cue, .scroll-cue.show { transform: translateX(-50%); }
+}
+
 /* ----------------------------------------------------------------- *
  * STL / CAD viewer
  * ----------------------------------------------------------------- */

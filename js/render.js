@@ -177,6 +177,8 @@
 
         var gallery = galleryHtml(p.gallery);
 
+        // Order: story first, then all media (3D model → hero → gallery)
+        // grouped at the bottom of the page.
         return '' +
             '<div class="container">' +
                 '<header class="detail-head" data-reveal>' +
@@ -189,9 +191,9 @@
                     (tags ? '<div class="detail-tags">' + tags + '</div>' : '') +
                     (specs ? '<div class="specs-bar">' + specs + '</div>' : '') +
                 '</header>' +
+                '<div class="narrative">' + blocks + '</div>' +
                 cad +
                 hero +
-                '<div class="narrative">' + blocks + '</div>' +
                 gallery +
             '</div>';
     }
