@@ -69,17 +69,80 @@
                     '<input class="input" type="email" id="email" autocomplete="username" required></div>' +
                 '<div class="field"><label for="password">Password</label>' +
                     '<input class="input" type="password" id="password" autocomplete="current-password" required></div>' +
-                '<button class="btn btn-primary" type="submit" style="width:100%;justify-content:center"><span>Sign in</span></button>' +
+                '<button class="btn btn-primary" type="submit" id="signin-btn" style="width:100%;justify-content:center"><span>Sign in</span></button>' +
+                '<p class="login-error" id="login-error" role="alert" hidden></p>' +
             '</form></div>';
+
+        var btn = document.getElementById('signin-btn');
+        var errBox = document.getElementById('login-error');
+
+        function showLoginError(msg) {
+            if (!msg) { errBox.hidden = true; errBox.textContent = ''; return; }
+            errBox.hidden = false; errBox.textContent = msg;
+            toast(msg, true);
+        }
 
         document.getElementById('login-form').addEventListener('submit', function (e) {
             e.preventDefault();
-            var email = val('email'), pw = val('password');
-            window.sb.auth.signInWithPassword({ email: email, password: pw }).then(function (res) {
-                if (res.error) { toast(res.error.message, true); }
-                // success handled by onAuthStateChange
-            });
+            var email = val('email').trim(), pw = val('password');
+            showLoginError('');
+            setBtnBusy(btn, true);
+
+            window.sb.auth.signInWithPassword({ email: email, password: pw })
+                .then(function (res) {
+                    setBtnBusy(btn, false);
+                    if (res.error) { showLoginError(authErrorMessage(res.error)); }
+                    // success handled by onAuthStateChange
+                })
+                .catch(function (err) {
+                    // signInWithPassword rejects on network/CORS/library failures,
+                    // which otherwise show nothing at all.
+                    setBtnBusy(btn, false);
+                    showLoginError(authErrorMessage(err));
+                });
         });
+    }
+
+    // Turn a raw Supabase auth error into a plain, actionable message so the
+    // login screen explains what to fix instead of dumping a scary string.
+    function authErrorMessage(error) {
+        var msg = (error && error.message) ? String(error.message) : '';
+        var code = (error && error.code) ? String(error.code) : '';
+        var status = error ? (error.status || error.statusCode || 0) : 0;
+        var low = msg.toLowerCase();
+
+        // No HTTP response came back — network, CORS, or a bad URL/anon key.
+        if (!status && (low.indexOf('failed to fetch') !== -1 ||
+                        low.indexOf('networkerror') !== -1 ||
+                        low.indexOf('load failed') !== -1 ||
+                        low.indexOf('fetch') !== -1)) {
+            return 'Couldn’t reach the auth server. Check your connection, and that the Supabase URL and anon key in js/config.js are correct.';
+        }
+        if (code === 'email_not_confirmed' || low.indexOf('email not confirmed') !== -1) {
+            return 'This account’s email isn’t confirmed yet. In Supabase → Authentication → Users, open your user and confirm it — or delete it and re-create it with “Auto confirm” ticked.';
+        }
+        if (code === 'invalid_credentials' || low.indexOf('invalid login credentials') !== -1) {
+            return 'Email or password is incorrect. Use the exact email the account was created with in Supabase → Authentication → Users, and reset the password there if unsure.';
+        }
+        if (code === 'over_request_rate_limit' || status === 429 || low.indexOf('rate limit') !== -1) {
+            return 'Too many attempts. Wait a minute, then try again.';
+        }
+        // 5xx (and Supabase’s "Database error querying schema" 500) are project-side.
+        if ((status && status >= 500) || low.indexOf('database error') !== -1 || low.indexOf('unexpected') !== -1) {
+            return 'Supabase hit a server error' + (status ? ' (' + status + ')' : '') +
+                (msg ? ' — “' + msg + '”' : '') +
+                '. This is a project-side issue, not your password. Check Authentication → Logs in the Supabase dashboard.';
+        }
+        return msg || 'Sign-in failed. Please try again.';
+    }
+
+    function setBtnBusy(btn, busy) {
+        if (!btn) { return; }
+        btn.disabled = busy;
+        var span = btn.querySelector('span');
+        if (!span) { return; }
+        if (busy) { btn.dataset.label = span.textContent; span.textContent = 'Signing in…'; }
+        else if (btn.dataset.label) { span.textContent = btn.dataset.label; }
     }
 
     /* ---------------- dashboard ---------------- */
