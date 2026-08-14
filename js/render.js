@@ -1,14 +1,29 @@
 /* =====================================================================
    render.js — renders project/concept lists and the project detail page.
-   Source of truth: Supabase (published rows). Falls back to the bundled
-   data/projects.json so the public site looks complete even before
-   Supabase is configured. Live admin edits override the JSON the moment
-   the database has rows.
+   Source of truth: Supabase (published rows), read live with the public
+   anon key so anything you publish in /admin.html appears on the site
+   immediately. If Supabase is unreachable (e.g. a free project paused)
+   or not configured, it falls back to the committed data/projects.json,
+   so the public site never goes blank. Run `npm run sync` to refresh
+   that offline snapshot and localize images when you want a durable copy.
    ===================================================================== */
 (function () {
     'use strict';
 
     var JSON_FALLBACK = 'data/projects.json';
+
+    function supaCfg() {
+        var c = window.SUPA_CONFIG;
+        if (!c || !c.url || !c.anonKey) { return null; }
+        if (c.url.indexOf('YOUR-PROJECT') !== -1 || c.anonKey.indexOf('YOUR-ANON') !== -1) { return null; }
+        return c;
+    }
+    function restUrl(cfg, query) {
+        return cfg.url.replace(/\/+$/, '') + '/rest/v1/projects?' + query;
+    }
+    function supaHeaders(cfg) {
+        return { apikey: cfg.anonKey, Authorization: 'Bearer ' + cfg.anonKey };
+    }
 
     document.addEventListener('DOMContentLoaded', function () {
         var list = document.querySelector('[data-work-list]');
@@ -20,10 +35,25 @@
     /* ---------------- data access ---------------- */
 
     function fetchAll() {
-        // Local-first: the public site reads the committed snapshot in
-        // data/projects.json and never calls Supabase. Author projects in
-        // /admin.html, then run `npm run sync` to refresh this file.
-        return fetchJson();
+        // Live-first: read published rows straight from Supabase so new
+        // projects appear the moment they're published. Fall back to the
+        // committed snapshot if Supabase isn't reachable or configured.
+        return fetchLive().then(function (rows) {
+            return (rows && rows.length) ? rows : fetchJson();
+        });
+    }
+
+    function fetchLive() {
+        var cfg = supaCfg();
+        if (!cfg) { return Promise.resolve(null); }
+        // Row-Level Security limits the anon key to published rows only.
+        return fetch(restUrl(cfg, 'select=*&order=sort_order'), { headers: supaHeaders(cfg), cache: 'no-cache' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (rows) {
+                if (!Array.isArray(rows)) { return null; }
+                return rows.filter(function (x) { return x.published !== false; });
+            })
+            .catch(function () { return null; });
     }
 
     function fetchJson() {
@@ -94,8 +124,23 @@
     }
 
     function fetchOne(slug) {
-        // Local-first (see fetchAll): served from data/projects.json.
-        return fetchJsonOne(slug);
+        // Live-first (see fetchAll), falling back to the committed snapshot.
+        return fetchLiveOne(slug).then(function (p) {
+            return p || fetchJsonOne(slug);
+        });
+    }
+
+    function fetchLiveOne(slug) {
+        var cfg = supaCfg();
+        if (!cfg) { return Promise.resolve(null); }
+        var q = 'select=*&slug=eq.' + encodeURIComponent(slug);
+        return fetch(restUrl(cfg, q), { headers: supaHeaders(cfg), cache: 'no-cache' })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (rows) {
+                // RLS hides drafts from the anon key, so this is a published row or nothing.
+                return (Array.isArray(rows) && rows[0] && rows[0].published !== false) ? rows[0] : null;
+            })
+            .catch(function () { return null; });
     }
 
     function fetchJsonOne(slug) {
