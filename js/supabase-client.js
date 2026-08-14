@@ -28,8 +28,13 @@
         return;
     }
 
+    // autoRefreshToken is intentionally OFF. This admin page is opened
+    // rarely, and a background refresh timer pointed at a paused/removed
+    // project retries forever — that's what produced the browser's
+    // "too many attempts fetching resources" error. The session still
+    // persists; if the token expires the owner simply signs in again.
     window.sb = window.supabase.createClient(cfg.url, cfg.anonKey, {
-        auth: { persistSession: true, autoRefreshToken: true }
+        auth: { persistSession: true, autoRefreshToken: false }
     });
     window.SUPA_READY = true;
 })();
