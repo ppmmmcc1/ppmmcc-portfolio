@@ -622,15 +622,6 @@ body.menu-open .menu-toggle span:nth-child(3) { transform: translateY(-6.5px) ro
 .spec .spec-label { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
 .spec .spec-value { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; margin-top: 0.25rem; }
 
-.detail-hero {
-    margin-top: var(--s8);
-    background: var(--lab);
-    border: 1px solid var(--hairline);
-    border-radius: var(--radius);
-    overflow: hidden;
-}
-.detail-hero img { width: 100%; }
-
 /* narrative blocks: why / how / problems */
 .narrative { max-width: var(--measure); margin-inline: auto; padding-block: var(--s10); }
 .narrative .block { margin-bottom: clamp(3rem, 7vw, 5rem); }

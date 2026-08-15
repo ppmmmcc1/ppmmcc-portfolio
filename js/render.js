@@ -167,18 +167,19 @@
             block('03', labels[2], p.problems_md)
         ].join('');
 
-        var hero = p.hero_image
-            ? '<div class="detail-hero" data-reveal><img src="' + attr(p.hero_image) + '" alt="' + attr(p.title) + '"></div>'
-            : '';
-
         var cad = p.stl_url
             ? cadHtml(p.stl_url, p.title)
             : '';
 
-        var gallery = galleryHtml(p.gallery);
+        // Fold the hero in as the first gallery image so the bottom of the
+        // page reads: 3D model → gallery.
+        var media = [];
+        if (p.hero_image) { media.push({ url: p.hero_image, alt: p.title }); }
+        media = media.concat(p.gallery || []);
+        var gallery = galleryHtml(media);
 
-        // Order: story first, then all media (3D model → hero → gallery)
-        // grouped at the bottom of the page.
+        // Order: story first, then all media (3D model → gallery) grouped at
+        // the bottom of the page.
         return '' +
             '<div class="container">' +
                 '<header class="detail-head" data-reveal>' +
@@ -193,7 +194,6 @@
                 '</header>' +
                 '<div class="narrative">' + blocks + '</div>' +
                 cad +
-                hero +
                 gallery +
             '</div>';
     }
