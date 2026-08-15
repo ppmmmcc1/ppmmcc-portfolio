@@ -178,8 +178,8 @@
         media = media.concat(p.gallery || []);
         var gallery = galleryHtml(media);
 
-        // Order: story first, then all media (3D model → gallery) grouped at
-        // the bottom of the page.
+        // Order for every project/concept: header → 3D model → story text →
+        // pictures (gallery, hero folded in) grouped at the bottom.
         return '' +
             '<div class="container">' +
                 '<header class="detail-head" data-reveal>' +
@@ -192,8 +192,8 @@
                     (tags ? '<div class="detail-tags">' + tags + '</div>' : '') +
                     (specs ? '<div class="specs-bar">' + specs + '</div>' : '') +
                 '</header>' +
-                '<div class="narrative">' + blocks + '</div>' +
                 cad +
+                '<div class="narrative">' + blocks + '</div>' +
                 gallery +
             '</div>';
     }
