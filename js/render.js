@@ -167,16 +167,19 @@
             block('03', labels[2], p.problems_md)
         ].join('');
 
-        var hero = p.hero_image
-            ? '<div class="detail-hero" data-reveal><img src="' + attr(p.hero_image) + '" alt="' + attr(p.title) + '"></div>'
-            : '';
-
         var cad = p.stl_url
             ? cadHtml(p.stl_url, p.title)
             : '';
 
-        var gallery = galleryHtml(p.gallery);
+        // Fold the hero in as the first gallery image so the bottom of the
+        // page reads: 3D model → gallery.
+        var media = [];
+        if (p.hero_image) { media.push({ url: p.hero_image, alt: p.title }); }
+        media = media.concat(p.gallery || []);
+        var gallery = galleryHtml(media);
 
+        // Order for every project/concept: header → 3D model → story text →
+        // pictures (gallery, hero folded in) grouped at the bottom.
         return '' +
             '<div class="container">' +
                 '<header class="detail-head" data-reveal>' +
@@ -190,7 +193,6 @@
                     (specs ? '<div class="specs-bar">' + specs + '</div>' : '') +
                 '</header>' +
                 cad +
-                hero +
                 '<div class="narrative">' + blocks + '</div>' +
                 gallery +
             '</div>';
