@@ -213,7 +213,10 @@
         var figs = g.map(function (it) {
             return '<figure data-reveal><img src="' + attr(it.url) + '" alt="' + attr(it.alt || '') + '" loading="lazy"></figure>';
         }).join('');
-        return '<div class="' + cls + '">' + figs + '</div>';
+        return '<section class="gallery-block" data-reveal>' +
+            '<h2 class="gallery-title"><span class="dot"></span>Gallery</h2>' +
+            '<div class="' + cls + '">' + figs + '</div>' +
+        '</section>';
     }
 
     function cadHtml(url, title) {

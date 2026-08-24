@@ -643,7 +643,14 @@ body.menu-open .menu-toggle span:nth-child(3) { transform: translateY(-6.5px) ro
 .block .prose li { margin-bottom: var(--s3); line-height: 1.7; color: var(--ink-soft); }
 
 /* gallery */
-.gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(0.75rem, 2vw, 1.25rem); padding-block: var(--s8); }
+.gallery-block { padding-block: var(--s8); }
+.gallery-title {
+    font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--accent); font-weight: 500;
+    display: flex; align-items: center; gap: 0.6rem; margin-bottom: var(--s5);
+}
+.gallery-title .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(0.75rem, 2vw, 1.25rem); }
 .gallery.single { grid-template-columns: 1fr; }
 @media (max-width: 640px) { .gallery { grid-template-columns: 1fr; } }
 .gallery figure {
