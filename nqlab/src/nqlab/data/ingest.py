@@ -92,13 +92,13 @@ def ingest(settings: Settings, raw: pl.DataFrame | None = None, source_notes: li
 
     rep_dir = settings.path("reports")
     rep_dir.mkdir(parents=True, exist_ok=True)
-    (rep_dir / f"quality_{data_version}.md").write_text(rep.to_markdown(), encoding="utf-8")
+    (rep_dir / f"quality_{data_version}.md").write_text(rep.to_markdown(research_before=hstart), encoding="utf-8")
 
     from nqlab.results.db import connect
 
     with connect(settings.path("results_db")) as con:
         con.execute("DELETE FROM excluded_sessions WHERE data_version = ?", [data_version])
-        rows = [(data_version, d, r) for d, r in excluded.items()]
+        rows = [(data_version, d, r) for d, r in excluded.items() if d < hstart]
         if rows:
             con.executemany("INSERT INTO excluded_sessions VALUES (?, ?, ?)", rows)
 

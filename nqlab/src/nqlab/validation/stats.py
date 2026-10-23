@@ -113,7 +113,6 @@ def spa_test(matrix: np.ndarray, reps: int = 1000, block_size: int = 5, seed: in
     st = StepM(bench, losses[:, keep], size=0.05, block_size=block_size, reps=reps, seed=seed)
     st.compute()
     idx = np.nonzero(keep)[0]
-    sup = [int(idx[int(str(i).split("_")[-1]) if not isinstance(i, (int, np.integer)) else int(i)])
-           for i in st.superior_models] if len(st.superior_models) else []
+    sup = [int(idx[int(i)]) for i in st.superior_models]
     return {"spa_p_consistent": float(pv["consistent"]), "spa_p_lower": float(pv["lower"]),
             "spa_p_upper": float(pv["upper"]), "stepm_superior": sup}

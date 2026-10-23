@@ -215,6 +215,21 @@ def run(family: str, stage: Optional[int] = typer.Option(None), auto: bool = typ
     _report_family(s, family)
 
 
+def _logged_backtest(s, strategy: str, params: dict, md=None, family_id: str | None = None, note: str = ""):
+    """Every real-data backtest goes into the trial ledger, including failed ones."""
+    from nqlab.data.market import MarketData
+    from nqlab.engine.backtest import run_backtest
+    from nqlab.results.store import ledger_error, ledger_log
+
+    try:
+        r = run_backtest(md or MarketData.from_store(s), strategy, params, s)
+    except BaseException as exc:
+        ledger_error(s, strategy, params, exc, family_id, "abandoned" if isinstance(exc, KeyboardInterrupt) else "errored")
+        raise
+    ledger_log(s, r, family_id, note=note)
+    return r
+
+
 def _report_family(s, family: str, out: Path | None = None) -> Path:
     from nqlab.runner.jobs import job_report
 
@@ -305,8 +320,14 @@ def backtest(strategy: str, params: Optional[str] = typer.Option(None, help="JSO
     st = get_strategy(strategy)
     p = {**st.defaults(), **(json.loads(params) if params else {})}
     md = MarketData.from_store(s)
-    path = build_report(s, md, strategy, p, out or s.path("reports") / f"{strategy}.html",
-                        n_trials=TrialLedger(s.path("results_db")).n_trials(), run_diag=not no_diag)
+    try:
+        path = build_report(s, md, strategy, p, out or s.path("reports") / f"{strategy}.html",
+                            n_trials=TrialLedger(s.path("results_db")).n_trials(), run_diag=not no_diag)
+    except BaseException as exc:
+        from nqlab.results.store import ledger_error
+
+        ledger_error(s, strategy, p, exc, None, "abandoned" if isinstance(exc, KeyboardInterrupt) else "errored")
+        raise
     con.print(f"report: {path}")
 
 
@@ -432,7 +453,7 @@ def parity_compare(family_or_strategy: str, params: Optional[str] = None, tolera
         strat = family_or_strategy
         p = {**get_strategy(strat).defaults(), **(json.loads(params) if params else {})}
     labels = pl.read_csv(labels_path(s), schema=LABEL_COLS)
-    r = run_backtest(MarketData.from_store(s), strat, p, s)
+    r = _logged_backtest(s, strat, p, note="parity compare")
     res = compare_labels(labels, r.trades, tolerance_min)
     con.print(res)
     if res["decision_required"]:
@@ -457,7 +478,7 @@ def parity_import(csv: Path, family_or_strategy: str = typer.Option(...), params
         strat = family_or_strategy
         p = {**get_strategy(strat).defaults(), **(json.loads(params) if params else {})}
     live = import_topstepx(csv)
-    r = run_backtest(MarketData.from_store(s), strat, p, s)
+    r = _logged_backtest(s, strat, p, note="parity import")
     con.print(compare_fills(live, r.trades))
 
 
@@ -481,7 +502,8 @@ def llm_postmortem(family: str, n: int = 20):
     s = _settings()
     f = FamilyStore(s).family(family)
     md = MarketData.from_store(s)
-    r = run_backtest(md, f["strategy"], json.loads(f["selected_params_json"] or "{}"), s)
+    r = _logged_backtest(s, f["strategy"], json.loads(f["selected_params_json"] or "{}"), md=md, family_id=family,
+                         note="llm post-mortem")
     p = postmortem(s, family, trade_context(md, r.trades, s, n))
     con.print(f"draft: {p}\n{NOISE_LINE}" if p else "skipped (Ollama unavailable)")
 

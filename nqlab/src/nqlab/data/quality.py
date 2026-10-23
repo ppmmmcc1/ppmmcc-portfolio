@@ -31,7 +31,8 @@ class QualityReport:
         if reason not in self.excluded[str(date)]:
             self.excluded[str(date)].append(reason)
 
-    def to_markdown(self) -> str:
+    def to_markdown(self, research_before=None) -> str:
+        """``research_before``: hide dates on/after the holdout boundary (count only)."""
         lines = ["# Data quality report", ""]
         for w in self.warnings:
             lines.append(f"> **WARNING:** {w}")
@@ -42,9 +43,12 @@ class QualityReport:
         for k, v in sorted(self.counts.items()):
             lines.append(f"| {k} | {v} |")
         lines.append("")
-        lines.append(f"**Excluded sessions: {len(self.excluded)}** (never traded, never silently dropped)")
+        shown = {d: r for d, r in self.excluded.items() if research_before is None or d < str(research_before)}
+        hidden = len(self.excluded) - len(shown)
+        lines.append(f"**Excluded sessions: {len(self.excluded)}** (never traded, never silently dropped)"
+                     + (f"; {hidden} of them are in the locked holdout (dates hidden)" if hidden else ""))
         lines.append("")
-        for d, rs in sorted(self.excluded.items()):
+        for d, rs in sorted(shown.items()):
             lines.append(f"- {d}: {', '.join(rs)}")
         for k, v in self.info.items():
             lines.append(f"\n**{k}:** {v}")

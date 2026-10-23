@@ -196,6 +196,10 @@ def stage_deflate(ctx: FamilyContext) -> StageResult:
     if not pb["pbo"] < ctx.crit["pbo_max"]:
         return StageResult(5, FAIL, f"Probability of backtest overfitting {pb['pbo']:.2f} >= {ctx.crit['pbo_max']}.", d)
     t = m["t_stat_r"]
+    if not np.isfinite(t):        # no stop -> R undefined: use the t-stat of daily P&L instead
+        dp = fm.pnl[:, i]
+        t = float(dp.mean() / (dp.std(ddof=1) / math.sqrt(len(dp)))) if len(dp) > 1 and dp.std(ddof=1) > 0 else float("nan")
+        d["t_stat_basis"] = "daily_pnl"
     if not (np.isfinite(t) and t >= ctx.crit["family_t_stat"]):
         return StageResult(5, INSUFFICIENT, f"t-statistic {t:.2f} is below the family bar of {ctx.crit['family_t_stat']} "
                            "(Harvey-Liu-Zhu); more data is needed before this can be called an edge.", d)

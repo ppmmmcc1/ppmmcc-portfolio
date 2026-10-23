@@ -21,8 +21,34 @@ def resolve_workers(w: str | int) -> int:
     return max(1, int(w))
 
 
+class _KeepAwake:
+    """Windows: ask the OS not to sleep while the batch runs (released on exit). Lid-close
+    and power-button actions are separate settings; see the README."""
+
+    ES_CONTINUOUS, ES_SYSTEM_REQUIRED = 0x80000000, 0x00000001
+
+    def __enter__(self):
+        if sys.platform == "win32":
+            import ctypes
+
+            ctypes.windll.kernel32.SetThreadExecutionState(self.ES_CONTINUOUS | self.ES_SYSTEM_REQUIRED)  # type: ignore[attr-defined]
+        return self
+
+    def __exit__(self, *exc):
+        if sys.platform == "win32":
+            import ctypes
+
+            ctypes.windll.kernel32.SetThreadExecutionState(self.ES_CONTINUOUS)  # type: ignore[attr-defined]
+        return False
+
+
 def run_queue(settings, workers: str | int = "auto", poll: float = 1.0, max_jobs: int | None = None,
               logfile: Path | None = None) -> dict[str, int]:
+    with _KeepAwake():
+        return _run_queue(settings, workers, poll, max_jobs, logfile)
+
+
+def _run_queue(settings, workers, poll, max_jobs, logfile) -> dict[str, int]:
     q = JobQueue(settings.path("queue_db"))
     n = resolve_workers(workers)
     rec = q.recover_stale()

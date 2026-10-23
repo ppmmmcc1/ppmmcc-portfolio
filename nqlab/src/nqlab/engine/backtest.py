@@ -65,13 +65,18 @@ def run_backtest(md, strategy_name: str, params: dict[str, Any], settings: Setti
     tick = settings.contract(strat.sizing(params).instrument).tick_size
     raw = simulate(eb, sig, strat.engine_params(params, fill_tier), tick=tick)
     sizing = strat.sizing(params)
-    trades = apply_costs(raw, sizing, settings)
-    trades = apply_daily_stop(trades, params.get("sizing.daily_stop_usd"))
+    sized = apply_costs(raw, sizing, settings)
+    out = sized.filter(pl.col("contracts") == 0)
+    pv = settings.contract(sizing.instrument).point_value
+    sized_out = {"n_sized_out": out.height,
+                 "sized_out_pnl_1c": float((out["pnl_points"] * pv).sum() - out.height * settings.round_turn_cost(sizing.instrument))
+                 if out.height else 0.0}
+    trades = apply_daily_stop(sized.filter(pl.col("contracts") > 0), params.get("sizing.daily_stop_usd"))
     daily = daily_pnl(trades, eb.session_dates, eb.excluded_sessions)
     return BacktestResult(
         strategy=strategy_name, params=params, fill_tier=fill_tier, trades=trades, daily=daily,
         excluded_sessions=eb.excluded_sessions, data_version=md.data_version,
         run_id=make_run_id(strategy_name, params, md.data_version, fill_tier, settings),
         instrument=sizing.instrument,
-        meta={"n_sized_out": raw.height - trades.height},
+        meta=sized_out,
     )

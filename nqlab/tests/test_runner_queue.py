@@ -63,7 +63,7 @@ def test_kill_midrun_resumes_from_checkpoint(settings, ingested):
     jid = q.add("mcpt", {"family_id": "kill_v1", "n_perm": 60})
     env = {**os.environ, "NQLAB_ROOT": str(settings.root)}
     proc = subprocess.Popen([sys.executable, "-m", "nqlab.cli", "run-queue", "--workers", "1"], env=env,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     done_before = 0
     for _ in range(600):
         time.sleep(0.5)
@@ -72,7 +72,12 @@ def test_kill_midrun_resumes_from_checkpoint(settings, ingested):
             done_before = len(cp["mcpt"]["done"])
             break
     assert done_before >= 10, "never reached a checkpoint"
-    os.killpg(proc.pid, signal.SIGKILL)          # kill runner AND worker (laptop lid closed)
+    # kill runner AND worker (laptop lid closed); portable: no process groups on Windows
+    hard = signal.SIGTERM if sys.platform == "win32" else signal.SIGKILL
+    wpid = q.get(jid)["worker_pid"]
+    os.kill(proc.pid, hard)
+    if wpid:
+        os.kill(int(wpid), hard)
     proc.wait()
     time.sleep(0.5)
     assert q.get(jid)["status"] == "running" and not pid_alive(q.get(jid)["worker_pid"])

@@ -334,12 +334,17 @@ def combine_trace(tape: TradeTape, rules: AccountRules, policy: SizingPolicy, li
         bal, mll, pnl, ev = np.zeros(n), np.zeros(n), np.zeros(n), np.zeros(n, np.int64)
         out, end, used, blocked, best = run_combine(*_args(tape, liq_ticks), d, 10**9, *rules.combine_tuple(),
                                                     policy.mode, policy.param, True, bal, mll, pnl, ev)
+        best = 0.0
         for k in range(used):
+            best = max(best, pnl[k])
+            profit = bal[k] - rules.start
             rows.append({"session_date": tape.session_dates[d + k], "attempt": attempt, "balance": bal[k],
-                         "mll_level": mll[k], "pnl_usd": pnl[k], "event": int(ev[k])})
+                         "mll_level": mll[k], "pnl_usd": pnl[k], "event": int(ev[k]),
+                         "consistency_ratio": best / profit if profit > 0 else None})
         d = end
     df = pl.DataFrame(rows, schema={"session_date": pl.Date, "attempt": pl.Int64, "balance": pl.Float64,
-                                    "mll_level": pl.Float64, "pnl_usd": pl.Float64, "event": pl.Int64})
+                                    "mll_level": pl.Float64, "pnl_usd": pl.Float64, "event": pl.Int64,
+                                    "consistency_ratio": pl.Float64})
     names = {EV_NONE: "", EV_MLL: "MLL_BREACH", EV_DLL: "DLL_HIT", EV_PASS: "PASS", EV_CONSISTENCY_BLOCK: "CONSISTENCY_BLOCK"}
     return df.with_columns(pl.col("event").replace_strict(names, return_dtype=pl.Utf8).alias("rule_events"))
 

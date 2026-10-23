@@ -84,3 +84,16 @@ def test_grid_dimensions_from_lists():
     dims = grid_dimensions(d)
     assert set(dims) == {"bollinger.length", "volume_profile.long_levels"}
     assert len(expand(d)) == 6
+
+
+def test_no_cross_fabricated_across_sessions():
+    """A1 regression: the previous value of a session's first window bar is the previous
+    MINUTE (continuous history), not the previous session's last window bar."""
+    from nqlab.strategies.bb_vp_macd import _crosses, _prev_distinct
+
+    line = np.array([1.0, 1.0, -1.0, -1.0, 2.0])
+    sig = np.zeros(5)
+    up, dn = _crosses(line, sig, line - sig, "line_cross_signal", 0)
+    assert dn.tolist() == [False, False, True, False, False] and up.tolist() == [False] * 4 + [True]
+    htf = np.array([1.0, 1.0, 1.0, 3.0, 3.0, 2.0])
+    assert np.isnan(_prev_distinct(htf)[0]) and _prev_distinct(htf)[3:].tolist() == [1.0, 1.0, 3.0]

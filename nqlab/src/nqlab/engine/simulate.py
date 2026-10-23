@@ -78,10 +78,7 @@ def apply_costs(trades: pl.DataFrame, sizing: Sizing, settings: Settings) -> pl.
         ((pl.col("gross_usd") - pl.col("fees_usd")) / (pl.col("stop_dist") * spec.point_value * pl.col("contracts"))).alias("r_multiple"),
         pl.lit(sizing.instrument).alias("instrument"),
     )
-    skipped = int((t["contracts"] == 0).sum())
-    if skipped:
-        t = t.filter(pl.col("contracts") > 0)
-    return t
+    return t   # rows with contracts == 0 are filtered (and reported) by run_backtest
 
 
 def daily_pnl(trades: pl.DataFrame, session_dates: list, excluded: list) -> pl.DataFrame:

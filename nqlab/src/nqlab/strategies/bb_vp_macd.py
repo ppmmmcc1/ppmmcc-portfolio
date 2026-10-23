@@ -24,7 +24,21 @@ def _et_to_ct_minutes(hhmm: str) -> int:
     return (h - 1) * 60 + m
 
 
+def _prev_distinct(x: np.ndarray) -> np.ndarray:
+    """Value of the previous DISTINCT run. For a higher-timeframe series repeated on every
+    1m row this is the previous HTF bar's value; for a 1m series it is the previous bar."""
+    x = np.asarray(x, float)
+    same = np.r_[False, (x[1:] == x[:-1]) | (np.isnan(x[1:]) & np.isnan(x[:-1]))]
+    run = np.cumsum(~same) - 1
+    starts = np.nonzero(~same)[0]
+    vals = x[starts]
+    prev_vals = np.r_[np.nan, vals[:-1]]
+    return prev_vals[run]
+
+
 def _direction(line, sig, hist, how: str) -> np.ndarray:
+    """Direction on FULL-length arrays aligned to md.bars (continuous through the night),
+    never on gathered engine bars (whose neighbours can be 17 hours apart)."""
     if how == "line_vs_signal":
         d = np.sign(line - sig)
     elif how == "hist_sign":
@@ -32,27 +46,29 @@ def _direction(line, sig, hist, how: str) -> np.ndarray:
     elif how == "line_vs_zero":
         d = np.sign(line)
     elif how == "line_slope":
-        d = np.sign(np.diff(line, prepend=np.nan))
+        d = np.sign(line - _prev_distinct(line))
     else:
         raise ValueError(f"unknown direction_definition {how!r}")
     return np.nan_to_num(d, nan=0.0)
 
 
 def _crosses(line, sig, hist, how: str, min_mag: float) -> tuple[np.ndarray, np.ndarray]:
-    """Bullish / bearish cross at each bar (decided on the bar's close)."""
+    """Bullish / bearish cross at each 1m row of the FULL history (decided on the row's
+    close). For an HTF series the cross appears on the row where the new HTF bar does."""
     if how == "line_cross_signal":
-        a, b = line - sig, np.roll(line - sig, 1)
+        a = line - sig
     elif how == "hist_sign_change":
-        a, b = hist, np.roll(hist, 1)
+        a = hist
     elif how == "line_cross_zero":
-        a, b = line, np.roll(line, 1)
+        a = line
     else:
         raise ValueError(f"unknown cross_definition {how!r}")
-    b[0] = np.nan
-    mag = np.abs(hist) >= float(min_mag)
-    up = (b <= 0) & (a > 0) & mag
-    dn = (b >= 0) & (a < 0) & mag
-    return np.nan_to_num(up, nan=0).astype(bool), np.nan_to_num(dn, nan=0).astype(bool)
+    b = np.r_[np.nan, a[:-1]]
+    with np.errstate(invalid="ignore"):
+        mag = np.abs(hist) >= float(min_mag)
+        up = (b <= 0) & (a > 0) & mag
+        dn = (b >= 0) & (a < 0) & mag
+    return up, dn
 
 
 def _recent(mask: np.ndarray, window: int, sess: np.ndarray) -> np.ndarray:
@@ -107,8 +123,9 @@ class _BBVPMacd(Strategy):
                         signal=int(p[f"context.{key}.signal"]), source=p[f"context.{key}.source"],
                         align=p["context.hourly_alignment"] if tf == 60 else "clock", series="back_adjusted")
             pre = f"m{tf}_"
-            dirs[tf] = _direction(gather(md, eb, f, pre + "macd_line"), gather(md, eb, f, pre + "macd_signal"),
-                                  gather(md, eb, f, pre + "macd_hist"), p["context.direction_definition"])
+            full = _direction(f[pre + "macd_line"].to_numpy().astype(float), f[pre + "macd_signal"].to_numpy().astype(float),
+                              f[pre + "macd_hist"].to_numpy().astype(float), p["context.direction_definition"])
+            dirs[tf] = full[eb.idx]
         rule = p["context.agreement_rule"]
         if rule == "both":
             ctx = np.where(dirs[15] == dirs[60], dirs[15], 0)
@@ -161,11 +178,11 @@ class _BBVPMacd(Strategy):
                 pre = "m5_"
             else:
                 raise ValueError("trigger.timeframes entries must be 1m or 5m")
-            up, dn = _crosses(gather(md, eb, f, pre + "macd_line"), gather(md, eb, f, pre + "macd_signal"),
-                              gather(md, eb, f, pre + "macd_hist"), p["trigger.cross_definition"],
+            up, dn = _crosses(f[pre + "macd_line"].to_numpy().astype(float), f[pre + "macd_signal"].to_numpy().astype(float),
+                              f[pre + "macd_hist"].to_numpy().astype(float), p["trigger.cross_definition"],
                               float(p["trigger.min_hist_magnitude"]))
-            ups.append(up)
-            dns.append(dn)
+            ups.append(up[eb.idx])
+            dns.append(dn[eb.idx])
         if len(ups) == 1:
             return ups[0], dns[0]
         w = int(p["trigger.both_within_bars"])

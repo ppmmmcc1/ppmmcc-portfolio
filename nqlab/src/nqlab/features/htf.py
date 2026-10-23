@@ -27,9 +27,8 @@ def htf_bars(md, tf: int, align: str = "clock", series: str = "back_adjusted") -
     if series not in SERIES:
         raise ValueError(series)
     sfx = _SUFFIX[series]
+    # only hourly bars differ between alignments (5/15/30m buckets already align with :30)
     offset_min = 30 if (align == "session" and tf == 60) else 0
-    if align == "session" and tf in (30,):
-        offset_min = 0  # 30m buckets are already aligned with :30
     tf_ns = tf * 60 * 1_000_000_000
     off_ns = offset_min * 60 * 1_000_000_000
     ns = pl.col("ts_utc").dt.epoch("ns")

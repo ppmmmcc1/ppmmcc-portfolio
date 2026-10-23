@@ -58,6 +58,12 @@ class DataStore:
             if hbase.exists():
                 shutil.rmtree(hbase)
             self._write_partitioned(hbase, holdout)
+            self.holdout.mkdir(parents=True, exist_ok=True)
+            (self.holdout / "README_LOCKED.txt").write_text(
+                "LOCKED HOLDOUT. Do not open, load, chart or summarize anything in this folder.\n"
+                "Looking at it even once turns it into in-sample data and the final test becomes meaningless.\n"
+                "The only sanctioned read is `nqlab holdout <family> --confirm`, which records the look forever.\n",
+                encoding="utf-8")
 
     def write_sessions(self, sessions: pl.DataFrame, holdout_sessions: pl.DataFrame) -> None:
         self.parquet.mkdir(parents=True, exist_ok=True)

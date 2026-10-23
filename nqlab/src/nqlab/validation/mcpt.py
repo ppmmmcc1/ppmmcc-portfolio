@@ -106,6 +106,12 @@ def run_mcpt(md, strategy: str, space: dict, fixed: dict, categorical: tuple, se
     else:
         from joblib import Parallel, delayed
 
+        # never ship cached features / engine bars to workers, and cap workers by memory
+        md = md.with_bars(md.bars, md.data_version)
+        cap_mb = float(settings.section("runner").get("max_worker_memory_mb", 2000))
+        per_worker = max(md.bars.estimated_size("mb") * 4.0, 1.0)     # bars + features + permuted copy
+        n_jobs = max(1, min(n_jobs, int(cap_mb // per_worker) or 1))
+
         # submit in waves of n_jobs chunks so checkpoints land regularly
         for w in range(0, len(chunks), n_jobs):
             wave = chunks[w:w + n_jobs]

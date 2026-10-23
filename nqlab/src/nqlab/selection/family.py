@@ -98,6 +98,9 @@ class FamilyStore:
             con.execute(f"UPDATE families SET {sets} WHERE family_id=?", [*kw.values(), fid])
 
     def record(self, fid: str, res: StageResult, data_version: str) -> None:
+        self.ledger.append([LedgerEntry(f"stage:{fid}:{res.stage}", "diagnostic", "completed", family_id=fid,
+                                        data_version=data_version,
+                                        note=f"STAGE {res.stage} {res.status}: {res.summary}"[:500])])
         self.art_dir.mkdir(parents=True, exist_ok=True)
         details = json.dumps(res.details, default=_json_default)
         with connect(self.db) as con:
@@ -106,10 +109,16 @@ class FamilyStore:
                          data_version, None])
 
     # ---- running ------------------------------------------------------------------------
+    def _ledger_failed(self, fid: str) -> int | None:
+        for st, status in self.ledger.stage_outcomes(fid):
+            if status == FAIL:
+                return st
+        return None
+
     def check_can_run(self, fid: str, stage: int | None, data_version: str) -> int:
         f = self.family(fid)
         load_prereg(self.settings, fid, f["prereg_hash"])
-        if f["status"] == "archived":
+        if f["status"] == "archived" or self._ledger_failed(fid) is not None:
             raise FamilyError(f"{fid} is ARCHIVED (it failed a gate). Failed families are archived, not tweaked; "
                               "a modified idea is a new family and joins the trial count.")
         if f["status"] in ("completed", "holdout_consumed"):
@@ -141,6 +150,12 @@ class FamilyStore:
         ctx = self.context(fid, md, **ctx_kw)
         try:
             res = STAGES[stage](ctx)
+        except KeyboardInterrupt:
+            res = StageResult(stage, ERRORED, "abandoned by the operator (interrupted)", {})
+            self.record(fid, res, md.data_version)
+            self.ledger.append([LedgerEntry(f"stage_abandoned:{fid}:{stage}", "diagnostic", "abandoned", family_id=fid,
+                                            strategy=ctx.prereg["strategy"], data_version=md.data_version)])
+            raise
         except Exception as exc:
             res = StageResult(stage, ERRORED, f"{type(exc).__name__}: {exc}", {})
             self.record(fid, res, md.data_version)
@@ -160,9 +175,13 @@ class FamilyStore:
     def promote(self, fid: str) -> int:
         f = self.family(fid)
         load_prereg(self.settings, fid, f["prereg_hash"])
-        if f["status"] == "archived":
+        if f["status"] == "archived" or self._ledger_failed(fid) is not None:
             raise FamilyError(f"{fid} is archived: it failed a gate and can never be promoted.")
         cur = int(f["current_stage"])
+        led = [status for st, status in self.ledger.stage_outcomes(fid) if st == cur]
+        if not led or led[-1] != PASS:
+            raise FamilyError(f"the trial ledger has no PASS for stage {cur}; promotion refused "
+                              "(the results tables disagree with the tamper-evident ledger)")
         res = [r for r in self.results(fid) if r["stage"] == cur]
         if not res:
             raise FamilyError(f"stage {cur} ({STAGE_NAMES[cur]}) has not been run")
