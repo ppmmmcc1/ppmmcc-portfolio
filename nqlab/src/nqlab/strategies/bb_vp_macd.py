@@ -71,6 +71,17 @@ def _crosses(line, sig, hist, how: str, min_mag: float) -> tuple[np.ndarray, np.
     return up, dn
 
 
+def _episode_age(ok: np.ndarray, sess: np.ndarray) -> np.ndarray:
+    """Bars since the current run of consecutive True values started (0 on its first bar)."""
+    age = np.zeros(len(ok), np.int64)
+    run = -1
+    for i in range(len(ok)):
+        if i == 0 or sess[i] != sess[i - 1] or not ok[i - 1]:
+            run = i
+        age[i] = i - run if ok[i] else 0
+    return age
+
+
 def _recent(mask: np.ndarray, window: int, sess: np.ndarray) -> np.ndarray:
     """True where ``mask`` fired within the last ``window`` bars of the same session."""
     out = np.zeros_like(mask)
@@ -293,6 +304,11 @@ class _BBVPMacd(Strategy):
                 if not bool(p["bollinger.reprice_each_bar"]):
                     price, sd, td, ok = self._freeze(eb, ok, price, band, sd, td,
                                                      int(p["orders.cancel_if_band_moves_ticks"]))
+                exp = int(p["orders.expiry_minutes"])
+                if exp > 0:
+                    # the order is re-sent every bar (reprice / keep alive), which would reset the
+                    # engine's expiry clock; limit each signal episode to its declared lifetime
+                    ok &= _episode_age(ok, eb.sess) < exp
                 sig.place(ok, side, "limit", price=price, stop_dist=sd, target_dist=td)
                 # withdraw the resting order as soon as its conditions lapse
                 lapse = ~ok & in_win

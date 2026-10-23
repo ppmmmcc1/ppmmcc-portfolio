@@ -142,3 +142,19 @@ def test_topstep_sizing_uses_buffer_pct():
     st = get_strategy("bb_vp_macd_limit")
     assert st.topstep_policy(params()).mode == SZ_BUFFER_FRAC
     assert st.topstep_policy(params(**{"sizing.risk_pct_of_mll_buffer": 0})).mode == SZ_RISK_USD
+
+
+def test_expiry_survives_repricing(small_md, session_settings):
+    """Re-sending the order every bar must not keep it alive past orders.expiry_minutes."""
+    from nqlab.engine.backtest import engine_bars_for
+    from nqlab.strategies.bb_vp_macd import _episode_age
+    from nqlab.strategies.registry import get_strategy
+
+    assert _episode_age(np.array([1, 1, 1, 0, 1, 1], bool), np.zeros(6, int)).tolist() == [0, 1, 2, 0, 0, 1]
+    st = get_strategy("bb_vp_macd_limit")
+    eb = engine_bars_for(small_md, session_settings, st.start_ct)
+    long_life = st.signals(small_md, eb, params(**{"orders.expiry_minutes": 0}))
+    short_life = st.signals(small_md, eb, params(**{"orders.expiry_minutes": 2}))
+    assert (short_life.l_type > 0).sum() < (long_life.l_type > 0).sum()
+    age = _episode_age(short_life.l_type > 0, eb.sess)
+    assert age.max() <= 1                      # never re-sent beyond its 2-minute life
