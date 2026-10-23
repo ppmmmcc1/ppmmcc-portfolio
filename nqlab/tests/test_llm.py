@@ -110,3 +110,24 @@ def test_every_llm_call_logged(settings, fake_ollama):
     roles.lint_spec(settings, settings.path("specs") / "bb_vp_macd.yaml")
     logs = list((settings.path("research_log") / "llm").glob("*_spec_lint.json"))
     assert logs and json.loads(logs[0].read_text())["model"] == "qwen2.5:7b-instruct"
+
+
+def test_llm_draft_registers_with_reserved_keys(settings, fake_ollama):
+    import yaml
+
+    from nqlab.selection.family import FamilyStore
+    from nqlab.selection.prereg import make_prereg
+
+    fake_ollama(json.dumps({"variants": [{"name": "short OR", "rationale": "tighter",
+                                          "param_space": {"or_minutes": [5]}}]}))
+    space = {"or_minutes": [5, 15, 30], "target_r": [1.0, 2.0]}
+    from nqlab.strategies.registry import get_strategy
+    fixed = {k: v for k, v in get_strategy("orb").defaults().items() if k not in space}
+    res = roles.generate_variants(settings, "orb", space, fixed, 1)
+    led = TrialLedger(settings.path("results_db"))
+    n0 = led.n_trials()
+    dr = res["variants"][0]
+    pre = make_prereg(settings, dr["family_id"], "orb", "LLM variant test", param_space=dr["param_space"],
+                      fixed=dr["fixed"], origin="llm_variant", llm_variant_id=dr["llm_variant_id"])
+    FamilyStore(settings).register(pre)
+    assert led.n_trials() == n0          # registering the draft did not double count

@@ -161,7 +161,7 @@ def _trade_day(balance, mll, day_real, dll_on, dll_amt, t0, t1, pnl, mae, stop, 
             balance -= loss
             day_real -= loss
             return balance, day_real, EV_MLL, traded
-        if dll_on and day_real - mae[k] * pv * n <= -dll_amt:
+        if dll_on and day_real - mae[k] * pv * n - fee_pc * n <= -dll_amt:
             loss = (dll_amt + day_real) + liq_ticks * tv * n + fee_pc * n
             balance -= loss
             day_real -= loss

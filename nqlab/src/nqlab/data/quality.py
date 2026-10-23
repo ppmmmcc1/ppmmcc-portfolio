@@ -182,3 +182,39 @@ def _timezone_sanity(s: pl.DataFrame, rep: QualityReport) -> None:
             f"largest volume jump is at {peak // 60:02d}:{peak % 60:02d} CT, not 08:30 CT. "
             "The CSV source_timezone or bar_label setting is probably wrong."
         )
+
+
+def cross_check_trades(bars: pl.DataFrame, trades: pl.DataFrame, tol_ticks: int = 1,
+                       vol_tol: float = 0.10) -> dict[str, Any]:
+    """Two sources available: rebuild 1-minute bars from trades and compare them with the
+    stored bars (spec 3.4). Disagreements are REPORTED with examples; deciding which source
+    is wrong needs a human."""
+    t = trades
+    if "symbol" in t.columns and "symbol" in bars.columns:
+        syms = set(bars["symbol"].unique().to_list())
+        if syms & set(t["symbol"].unique().to_list()):
+            t = t.filter(pl.col("symbol").is_in(list(syms)))
+        elif "contract_conv" in bars.columns:
+            t = t.filter(pl.col("symbol").is_in(bars["contract_conv"].unique().implode()))
+    rebuilt = (t.sort("ts_utc").group_by(pl.col("ts_utc").dt.truncate("1m").alias("ts_utc"), maintain_order=True)
+               .agg(pl.col("price").first().alias("o_t"), pl.col("price").max().alias("h_t"),
+                    pl.col("price").min().alias("l_t"), pl.col("price").last().alias("c_t"),
+                    pl.col("size").sum().alias("v_t")))
+    j = bars.select("ts_utc", "session_date", "open", "high", "low", "close", "volume").join(rebuilt, on="ts_utc", how="inner")
+    tol = tol_ticks * TICK + 1e-9
+    bad = j.with_columns(
+        (((pl.col("open") - pl.col("o_t")).abs() > tol) | ((pl.col("high") - pl.col("h_t")).abs() > tol)
+         | ((pl.col("low") - pl.col("l_t")).abs() > tol) | ((pl.col("close") - pl.col("c_t")).abs() > tol)).alias("px_bad"),
+        (((pl.col("volume") - pl.col("v_t")).abs() / pl.max_horizontal(pl.col("v_t"), pl.lit(1))) > vol_tol).alias("vol_bad"),
+    )
+    n = bad.height
+    per_sess = bad.group_by("session_date").agg(pl.col("px_bad").sum().alias("px_bad"), pl.len().alias("n")) \
+                  .filter(pl.col("px_bad") > 0).sort("px_bad", descending=True)
+    return {
+        "bars_compared": n,
+        "price_disagreements": int(bad["px_bad"].sum()) if n else 0,
+        "volume_disagreements": int(bad["vol_bad"].sum()) if n else 0,
+        "price_disagreement_frac": float(bad["px_bad"].mean()) if n else float("nan"),
+        "worst_sessions": per_sess.head(10).to_dicts(),
+        "examples": bad.filter(pl.col("px_bad")).head(10).to_dicts(),
+    }

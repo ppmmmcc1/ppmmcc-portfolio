@@ -9,7 +9,7 @@ description = "Statistically honest backtesting for intraday NQ/MNQ futures with
 requires-python = ">=3.11"
 dependencies = [
   "polars", "pyarrow", "duckdb", "numpy", "numba", "scipy", "statsmodels", "arch",
-  "pandas", "pandas_market_calendars", "pydantic>=2", "typer", "rich",
+  "pandas", "pandas_market_calendars", "tzdata", "pydantic>=2", "typer", "rich",
   "plotly", "jinja2", "joblib", "httpx", "pyyaml",
   "yfinance", "databento",
 ]

@@ -70,6 +70,37 @@ def data_ingest(source: Optional[str] = typer.Option(None, help="csv | yfinance 
     con.print(f"quality report: {s.path('reports') / f'quality_{r.data_version}.md'}")
 
 
+@data_app.command("ingest-ticks")
+def data_ingest_ticks(schema: str = typer.Option("trades", help="trades | mbo"), start: str = typer.Option(...),
+                      end: str = typer.Option(...), confirm_cost: bool = typer.Option(False)):
+    """Download Databento tick data (cost estimated and printed first) for fill tiers 3/4."""
+    from nqlab.data.databento_source import DatabentoSource
+    from nqlab.data.store import DataStore
+
+    s = _settings()
+    if schema not in ("trades", "mbo"):
+        _die("schema must be trades or mbo")
+    src = DatabentoSource(s, confirm_cost=confirm_cost)
+    a, b = dt.date.fromisoformat(start), dt.date.fromisoformat(end)
+    df = src.fetch_trades(None, a, b) if schema == "trades" else src.fetch_mbo(a, b)
+    store = DataStore(s)
+    con.print(store.write_ticks(schema, df))
+    if schema == "trades":
+        import polars as pl
+
+        from nqlab.data.quality import cross_check_trades
+
+        man = store.manifest()
+        bars = store.scan_front(man["root"]).filter(
+            (pl.col("session_date") >= a) & (pl.col("session_date") <= b)).collect()
+        res = cross_check_trades(bars, df)
+        out = s.path("reports") / f"quality_trades_vs_bars_{man['data_version']}_{a}_{b}.json"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(res, indent=2, default=str), encoding="utf-8")
+        con.print(f"bars vs trades: {res['price_disagreements']} of {res['bars_compared']} bars disagree on price, "
+                  f"{res['volume_disagreements']} on volume (details: {out})")
+
+
 @data_app.command("quality")
 def data_quality():
     """Print the latest data-quality report."""
@@ -151,7 +182,9 @@ def spec_scaffold(name: str, template: str = "bb_vp_macd"):
 
 # ------------------------------------------------------------------------------- families
 @app.command()
-def preregister(family: str, strategy: Optional[str] = typer.Option(None), hypothesis: str = typer.Option(..., help="one sentence"),
+def preregister(family: str, strategy: Optional[str] = typer.Option(None),
+                hypothesis: Optional[str] = typer.Option(None, help="one sentence"),
+                from_draft: Optional[Path] = typer.Option(None, help="register an LLM-variant draft (keeps its reserved trial keys)"),
                 spec: Optional[Path] = typer.Option(None, help="strategy spec YAML (operator strategy)"),
                 space: Optional[str] = typer.Option(None, help="JSON param grid; default = the strategy's declared grid"),
                 fixed: Optional[str] = typer.Option(None, help="JSON fixed params")):
@@ -163,6 +196,20 @@ def preregister(family: str, strategy: Optional[str] = typer.Option(None), hypot
     sp = json.loads(space) if space else None
     fx = json.loads(fixed) if fixed else {}
     spec_hash = None
+    origin, variant_id = "human", None
+    if from_draft:
+        import yaml
+
+        dr = yaml.safe_load(Path(from_draft).read_text(encoding="utf-8"))
+        if not dr.get("llm_variant_id"):
+            _die("not an LLM-variant draft (no llm_variant_id)")
+        if family != dr["family_id"]:
+            _die(f"an LLM draft must be registered under its reserved id {dr['family_id']!r}")
+        strategy, sp, fx = dr["strategy"], dr["param_space"], dr.get("fixed") or {}
+        origin, variant_id = "llm_variant", dr["llm_variant_id"]
+        hypothesis = hypothesis or f"LLM variant '{dr.get('name', '')}': {dr.get('rationale', '')}"
+    if not hypothesis:
+        _die("--hypothesis is required: state what you expect before you test it")
     if spec:
         from nqlab.strategies.spec import META_KEYS, SpecIncomplete, flatten, grid_dimensions, load_spec, spec_hash as sh, undecided
 
@@ -181,7 +228,8 @@ def preregister(family: str, strategy: Optional[str] = typer.Option(None), hypot
     from nqlab.errors import Refusal
 
     try:
-        pre = make_prereg(s, family, strategy, hypothesis, param_space=sp, fixed=fx, spec_hash=spec_hash)
+        pre = make_prereg(s, family, strategy, hypothesis, param_space=sp, fixed=fx, spec_hash=spec_hash,
+                          origin=origin, llm_variant_id=variant_id)
         path = FamilyStore(s).register(pre)
     except Refusal as e:
         _die(str(e))
@@ -280,6 +328,22 @@ def families():
 
 
 @app.command()
+def rank():
+    """Families ranked by P(first payout) (NOT Sharpe), with every other headline number beside it."""
+    from nqlab.selection.ranking import rank_families
+
+    f = lambda x, fmt="{:.2f}": "n/a" if x is None else fmt.format(x)  # noqa: E731
+    t = Table("family", "status", "stage", "P(1st payout)", "zero-edge", "P(pass)", "Sharpe ± SE", "DSR",
+              "exp R", "exp $", "PF", "max L", "trades", title="Ranked by P(first payout), never by Sharpe")
+    for r in rank_families(_settings()):
+        t.add_row(r["family_id"], r["status"], f"{r['furthest_stage']} {r['last_result']}",
+                  f(r["p_first_payout"], "{:.1%}"), f(r["zero_edge_p_first_payout"], "{:.1%}"), f(r["p_pass"], "{:.1%}"),
+                  f"{f(r['sharpe_ann'])} ± {f(r['sharpe_ann_se'])}", f(r["dsr"]), f(r["expectancy_r"]),
+                  f(r["expectancy_usd"]), f(r["profit_factor"]), f(r["max_consec_losses"], "{:.0f}"), f(r["n_trades"], "{:.0f}"))
+    con.print(t)
+
+
+@app.command()
 def report(target: str, out: Optional[Path] = typer.Option(None)):
     """HTML report for a family id, or for a run id from the results store."""
     from nqlab.results.db import connect
@@ -346,6 +410,34 @@ def calibrate(n_datasets: int = 40, n_perm: int = 49, workers: str = "auto"):
     con.print("[green]validators calibrated[/green]" if ok else "[red]VALIDATORS ARE BROKEN: do not trust any result[/red]")
     if not ok:
         raise typer.Exit(1)
+
+
+@app.command("fills-calibrate")
+def fills_calibrate(family_or_strategy: str, params: Optional[str] = None, n_sessions: int = 200):
+    """Compare fill tiers 1/2/3(/4) on a sample of sessions with tick data (Databento)."""
+    from nqlab.data.market import MarketData
+    from nqlab.data.store import DataStore
+    from nqlab.engine.fill_calibration import compare_tiers
+    from nqlab.errors import Refusal
+    from nqlab.selection.family import FamilyStore
+    from nqlab.strategies.registry import get_strategy
+
+    s = _settings()
+    store = DataStore(s)
+    if not store.has_ticks("trades"):
+        _die("no trades data: run `nqlab data ingest-ticks --schema trades ...` (Databento) first")
+    try:
+        f = FamilyStore(s).family(family_or_strategy)
+        strat, p = f["strategy"], json.loads(f["selected_params_json"] or "{}")
+    except Refusal:
+        strat = family_or_strategy
+        p = {**get_strategy(strat).defaults(), **(json.loads(params) if params else {})}
+    mbo = store.scan_ticks("mbo").collect() if store.has_ticks("mbo") else None
+    res = compare_tiers(MarketData.from_store(s), strat, p, s, store.scan_ticks("trades").collect(), mbo, n_sessions)
+    t = Table("tier", "trades", "net $", "expectancy $", title=f"{res['n_sessions']} sessions, {res.get('window_et')} ET")
+    for k, v in sorted(res["tiers"].items()):
+        t.add_row(v["label"], str(v["n_trades"]), f"{v['net_usd']:,.0f}", f"{v['expectancy_usd']:,.2f}")
+    con.print(t)
 
 
 # ------------------------------------------------------------------------------- ledger
@@ -536,7 +628,8 @@ def llm_summary(batch: Optional[str] = None):
 
     s = _settings()
     jobs = [j for j in JobQueue(s.path("queue_db")).list() if batch is None or j.get("batch") == batch]
-    facts = [{"job": j["job_id"], "type": j["type"], "status": j["status"], "error": (j["error"] or "")[:300],
+    facts = [{"job": j["payload"].get("family_id") or j["payload"].get("strategy") or j["job_id"], "type": j["type"],
+              "status": j["status"], "error": (j["error"] or "")[:300],
               "result": json.loads(j["result_json"]) if j["result_json"] else None} for j in jobs]
     con.print(f"wrote {morning_summary(s, facts, batch)}")
 

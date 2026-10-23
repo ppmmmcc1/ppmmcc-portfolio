@@ -117,6 +117,62 @@ def _developing(lo_bins, hi_bins, vols, sess, include, va_pct, tie, out_poc, out
         i = j
 
 
+@nb.njit(cache=True)
+def _developing_events(ptr, ev_bin, ev_vol, sess, include, va_pct, tie, out_poc, out_vah, out_val):
+    """Developing profile from exact trade volume per (bar, price bin)."""
+    n = sess.shape[0]
+    i = 0
+    while i < n:
+        j = i
+        while j < n and sess[j] == sess[i]:
+            j += 1
+        base = 1 << 60
+        top = -(1 << 60)
+        for k in range(i, j):
+            if include[k]:
+                for e in range(ptr[k], ptr[k + 1]):
+                    if ev_bin[e] < base:
+                        base = ev_bin[e]
+                    if ev_bin[e] > top:
+                        top = ev_bin[e]
+        if top >= base:
+            hist = np.zeros(top - base + 1)
+            have = False
+            for k in range(i, j):
+                if include[k]:
+                    for e in range(ptr[k], ptr[k + 1]):
+                        hist[ev_bin[e] - base] += ev_vol[e]
+                        have = True
+                if have:
+                    p, h, l = _value_area(hist, va_pct, tie)
+                    if p >= 0:
+                        out_poc[k] = base + p
+                        out_vah[k] = base + h
+                        out_val[k] = base + l
+        i = j
+
+
+def _trade_events(md, bin_size: float):
+    """Aggregate trades to (bar index, price bin) -> volume. Trades are matched to the 1m
+    bar that contains them; trades outside any loaded bar are ignored (so a truncated
+    history never sees later trades)."""
+    tr = md.meta.get("trades")
+    if tr is None:
+        raise ValueError("volume profile build_from='trades' needs trades data (nqlab data ingest-ticks); "
+                         "with 1-minute bars only build_from='bars' (approximate) is possible")
+    lf = tr.lazy() if isinstance(tr, pl.DataFrame) else tr
+    t0, t1 = md.bars["ts_utc"].min(), md.bars["ts_close_utc"].max()
+    ev = (lf.filter((pl.col("ts_utc") >= t0) & (pl.col("ts_utc") < t1))
+          .with_columns(pl.col("ts_utc").dt.truncate("1m").alias("_bar"),
+                        (pl.col("price") / bin_size + 1e-9).floor().cast(pl.Int64).alias("_bin"))
+          .group_by("_bar", "_bin").agg(pl.col("size").sum().cast(pl.Float64).alias("_v")).collect())
+    idx = md.bars.select(pl.col("ts_utc").alias("_bar")).with_row_index("_i")
+    ev = ev.join(idx, on="_bar", how="inner").sort("_i", "_bin")
+    ev_i = ev["_i"].to_numpy().astype(np.int64)
+    ptr = np.searchsorted(ev_i, np.arange(md.bars.height + 1)).astype(np.int64)
+    return ptr, ev["_bin"].to_numpy().astype(np.int64), ev["_v"].to_numpy()
+
+
 def _bins(md, bin_size: float):
     b = md.bars
     lo = np.floor(b["low"].to_numpy() / bin_size + 1e-9).astype(np.int64)
@@ -134,22 +190,36 @@ def _session_codes(md) -> np.ndarray:
     return md.bars["session_date"].rank("dense").cast(pl.Int64).to_numpy()
 
 
-def _session_profiles(md, mask, bin_size, va_pct, tie, lookback_sessions):
+def _session_profiles(md, mask, bin_size, va_pct, tie, lookback_sessions, build_from="bars"):
     """Profile of the previous ``lookback_sessions`` sessions (bars in ``mask``), broadcast
     to every bar of the following session."""
-    lo, hi, vol = _bins(md, bin_size)
     codes = _session_codes(md)
     uniq = np.unique(codes)
     hists = {}
-    for c in uniq:
-        m = (codes == c) & mask
-        if not m.any():
-            continue
-        base, top = int(lo[m].min()), int(hi[m].max())
-        h = np.zeros(top - base + 1)
-        for a, b_, v in zip(lo[m], hi[m], vol[m]):
-            _add_bar(h, base, int(a), int(b_), float(v))
-        hists[int(c)] = (base, h)
+    if build_from == "trades":
+        ptr, ev_bin, ev_vol = _trade_events(md, bin_size)
+        for c in uniq:
+            rows = np.nonzero((codes == c) & mask)[0]
+            if not len(rows):
+                continue
+            sel = np.concatenate([np.arange(ptr[r], ptr[r + 1]) for r in rows]).astype(np.int64)
+            if not len(sel):
+                continue
+            base, top = int(ev_bin[sel].min()), int(ev_bin[sel].max())
+            h = np.zeros(top - base + 1)
+            np.add.at(h, ev_bin[sel] - base, ev_vol[sel])
+            hists[int(c)] = (base, h)
+    else:
+        lo, hi, vol = _bins(md, bin_size)
+        for c in uniq:
+            m = (codes == c) & mask
+            if not m.any():
+                continue
+            base, top = int(lo[m].min()), int(hi[m].max())
+            h = np.zeros(top - base + 1)
+            for a, b_, v in zip(lo[m], hi[m], vol[m]):
+                _add_bar(h, base, int(a), int(b_), float(v))
+            hists[int(c)] = (base, h)
     res = {}
     for idx, c in enumerate(uniq):
         prev = [int(x) for x in uniq[max(0, idx - lookback_sessions):idx] if int(x) in hists]
@@ -177,35 +247,51 @@ def _frame(poc, vah, val, approximate=True) -> pl.DataFrame:
                          "vp_approximate": np.full(len(poc), approximate)})
 
 
-_DEF = {"bin_size": 0.25, "va_pct": 0.70, "poc_tie": "mid"}
-_NOTE = "built from 1m bars (volume spread uniformly over each bar's range)"
+_DEF = {"bin_size": 0.25, "va_pct": 0.70, "poc_tie": "mid", "build_from": "bars"}
+_NOTE = "built from 1m bars (volume spread uniformly over each bar's range) unless build_from='trades'"
+
+
+def _check(build_from):
+    if build_from not in ("bars", "trades"):
+        raise ValueError("build_from must be 'bars' (approximate) or 'trades' (exact)")
 
 
 @feature("vp_prior_rth", series="unadjusted", unadjusted_only=True, defaults=_DEF, approximate_note=_NOTE)
-def vp_prior_rth(md, bin_size, va_pct, poc_tie):
-    return _frame(*_session_profiles(md, _rth_mask(md), bin_size, va_pct, _TIE[poc_tie], 1))
+def vp_prior_rth(md, bin_size, va_pct, poc_tie, build_from):
+    _check(build_from)
+    return _frame(*_session_profiles(md, _rth_mask(md), bin_size, va_pct, _TIE[poc_tie], 1, build_from),
+                  approximate=build_from == "bars")
 
 
 @feature("vp_prior_globex", series="unadjusted", unadjusted_only=True, defaults=_DEF, approximate_note=_NOTE)
-def vp_prior_globex(md, bin_size, va_pct, poc_tie):
-    return _frame(*_session_profiles(md, np.ones(md.bars.height, bool), bin_size, va_pct, _TIE[poc_tie], 1))
+def vp_prior_globex(md, bin_size, va_pct, poc_tie, build_from):
+    _check(build_from)
+    return _frame(*_session_profiles(md, np.ones(md.bars.height, bool), bin_size, va_pct, _TIE[poc_tie], 1, build_from),
+                  approximate=build_from == "bars")
 
 
 @feature("vp_composite", series="unadjusted", unadjusted_only=True, defaults={**_DEF, "n_days": 5},
          approximate_note=_NOTE)
-def vp_composite(md, bin_size, va_pct, poc_tie, n_days):
-    return _frame(*_session_profiles(md, _rth_mask(md), bin_size, va_pct, _TIE[poc_tie], int(n_days)))
+def vp_composite(md, bin_size, va_pct, poc_tie, n_days, build_from):
+    _check(build_from)
+    return _frame(*_session_profiles(md, _rth_mask(md), bin_size, va_pct, _TIE[poc_tie], int(n_days), build_from),
+                  approximate=build_from == "bars")
 
 
 @feature("vp_developing", series="unadjusted", unadjusted_only=True, defaults={**_DEF, "rth_only": True},
          approximate_note=_NOTE)
-def vp_developing(md, bin_size, va_pct, poc_tie, rth_only):
-    lo, hi, vol = _bins(md, bin_size)
+def vp_developing(md, bin_size, va_pct, poc_tie, rth_only, build_from):
+    _check(build_from)
     include = _rth_mask(md) if rth_only else np.ones(md.bars.height, bool)
     n = md.bars.height
     poc = np.full(n, -(1 << 62), np.int64)
     vah = poc.copy()
     val = poc.copy()
-    _developing(lo, hi, vol, _session_codes(md), include, float(va_pct), _TIE[poc_tie], poc, vah, val)
+    if build_from == "trades":
+        ptr, ev_bin, ev_vol = _trade_events(md, bin_size)
+        _developing_events(ptr, ev_bin, ev_vol, _session_codes(md), include, float(va_pct), _TIE[poc_tie], poc, vah, val)
+    else:
+        lo, hi, vol = _bins(md, bin_size)
+        _developing(lo, hi, vol, _session_codes(md), include, float(va_pct), _TIE[poc_tie], poc, vah, val)
     to_px = lambda a: np.where(a == -(1 << 62), np.nan, a * bin_size)  # noqa: E731
-    return _frame(to_px(poc), to_px(vah), to_px(val))
+    return _frame(to_px(poc), to_px(vah), to_px(val), approximate=build_from == "bars")

@@ -1,0 +1,40 @@
+# nqlab test suite on the operator's platform (Windows). Only runs when nqlab/ changes.
+name: nqlab
+
+on:
+  push:
+    paths: ["nqlab/**", ".github/workflows/nqlab.yml"]
+  pull_request:
+    paths: ["nqlab/**", ".github/workflows/nqlab.yml"]
+  workflow_dispatch:
+    inputs:
+      slow:
+        description: "Also run the slow suite (null calibration, kill/resume)"
+        type: boolean
+        default: false
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+        python: ["3.12"]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: nqlab
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Fast suite (includes the lookahead property test and golden engine tests)
+        run: pytest -q -p no:warnings
+      - name: Slow suite (null calibration harness, kill/resume)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.slow }}
+        run: pytest -q -m slow -p no:warnings

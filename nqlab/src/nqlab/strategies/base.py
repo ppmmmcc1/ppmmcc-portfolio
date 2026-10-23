@@ -17,6 +17,7 @@ from nqlab.engine.simulate import Sizing
 
 class Strategy:
     name: str = "base"
+    version: int = 1                     # bump when signal logic changes (part of every run_id)
     description: str = ""
     # default parameter grid: name -> list of values (ordered unless listed in `categorical`)
     param_space: dict[str, list[Any]] = {}
@@ -41,6 +42,13 @@ class Strategy:
     def sizing(self, p: dict[str, Any]) -> Sizing:
         return Sizing(instrument=p.get("instrument", "NQ"), contracts=int(p.get("contracts", 1)),
                       risk_usd=p.get("risk_usd"))
+
+    def topstep_policy(self, p: dict[str, Any]):
+        """Sizing used in the Topstep simulation (defaults to the backtest sizing)."""
+        from nqlab.risk.topstep import SizingPolicy
+
+        sz = self.sizing(p)
+        return SizingPolicy.risk_usd(sz.risk_usd) if sz.risk_usd else SizingPolicy.fixed(sz.contracts)
 
     def signals(self, md, eb: EngineBars, p: dict[str, Any]) -> Signals:  # pragma: no cover
         raise NotImplementedError

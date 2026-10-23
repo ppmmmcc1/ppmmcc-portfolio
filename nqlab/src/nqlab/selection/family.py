@@ -167,7 +167,9 @@ class FamilyStore:
         if res.status == FAIL:
             self._set(fid, status="archived")
             log.warning("%s FAILED stage %d (%s): archived. %s", fid, stage, STAGE_NAMES[stage], res.summary)
-        if res.status == PASS:
+        if res.status in (PASS, FAIL, INSUFFICIENT):
+            # the plateau pick on the full research sample, whatever the outcome, so that
+            # every report describes the config the funnel actually selected
             _, cfg = ctx.selected()
             self._set(fid, selected_params_json=canonical_json(cfg))
         return res

@@ -43,7 +43,7 @@ bollinger:
 
 volume_profile:
   source: REQUIRED_UNDECIDED                 # prior_rth | prior_globex | composite | developing
-  composite_days: REQUIRED_UNDECIDED         # only used when source = composite
+  composite_days: REQUIRED_UNDECIDED         # only used when source = composite (null otherwise)
   value_area_pct: REQUIRED_UNDECIDED         # e.g. 0.70
   bin_size: REQUIRED_UNDECIDED               # 0.25 or an aggregated size (points)
   poc_tie: REQUIRED_UNDECIDED                # mid | low | high

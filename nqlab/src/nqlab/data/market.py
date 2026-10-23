@@ -53,9 +53,11 @@ class MarketData:
         man = store.manifest()
         bars = store.scan_front(man["root"], holdout=holdout).collect()
         sess = store.sessions(holdout=holdout)
+        meta = {"roll_method": man.get("roll_method"), "manifest": man}
+        if not holdout and store.has_ticks("trades"):
+            meta["trades"] = store.scan_ticks("trades")      # lazy: exact volume profiles, tier 3 fills
         return cls(bars, sess, man["data_version"] + ("-holdout" if holdout else ""),
-                   provenance=man.get("provenance", ""), warnings=list(man.get("warnings", [])),
-                   meta={"roll_method": man.get("roll_method"), "manifest": man})
+                   provenance=man.get("provenance", ""), warnings=list(man.get("warnings", [])), meta=meta)
 
     @classmethod
     def from_raw(cls, raw: pl.DataFrame, settings: Settings, data_version: str = "inmem") -> "MarketData":

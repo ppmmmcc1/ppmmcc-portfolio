@@ -66,3 +66,42 @@ def test_tiers_require_data():
     assert [m.tier for m in available_models()] == [2, 1]
     assert [m.tier for m in available_models(True, True)] == [2, 1, 3, 4]
     assert available_models()[0].headline
+
+
+def ticks_from_bars(md, dates):
+    """Synthetic trade prints from bars: open, low, high, close inside each minute."""
+    b = md.bars.filter(pl.col("session_date").is_in(dates))
+    rows = []
+    for r in b.iter_rows(named=True):
+        t = r["ts_utc"]
+        for k, px in enumerate((r["open"], r["low"], r["high"], r["close"])):
+            rows.append((t + dt.timedelta(seconds=5 + 15 * k), px, max(1, r["volume"] // 4)))
+    return pl.DataFrame(rows, schema={"ts_utc": pl.Datetime("us", "UTC"), "price": pl.Float64, "size": pl.Int64}, orient="row")
+
+
+def test_compare_tiers_on_sample(small_md, session_settings):
+    from nqlab.engine.fill_calibration import compare_tiers
+    from nqlab.strategies.registry import get_strategy
+
+    dates = small_md.sessions["session_date"].to_list()[5:25]
+    tr = ticks_from_bars(small_md, dates)
+    p = get_strategy("orb").defaults()
+    res = compare_tiers(small_md, "orb", p, session_settings, tr, n_sessions=10)
+    assert res["n_sessions"] == 10 and set(res["tiers"]) == {1, 2, 3}
+    # stop-entry strategy: tier 3 replays the same breakouts; counts must be comparable
+    assert res["tiers"][3]["n_trades"] <= res["tiers"][1]["n_trades"] + 2
+
+
+def test_ticks_respect_lockbox(settings):
+    from nqlab.data.holdout import HoldoutAccessError
+    from nqlab.data.store import DataStore
+
+    store = DataStore(settings)
+    store.set_lockbox({"holdout_start": "2024-02-01"})
+    df = pl.DataFrame({"ts_utc": [dt.datetime(2024, 1, 10, 15, tzinfo=dt.timezone.utc),
+                                  dt.datetime(2024, 2, 10, 15, tzinfo=dt.timezone.utc)],
+                       "price": [100.0, 101.0], "size": [1, 1]})
+    assert store.write_ticks("trades", df) == {"research_rows": 1, "holdout_rows": 1}
+    assert store.scan_ticks("trades").collect().height == 1
+    with pytest.raises(HoldoutAccessError):
+        list((settings.path("holdout") / "trades").iterdir())

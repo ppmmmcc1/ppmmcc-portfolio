@@ -90,7 +90,11 @@ class _BBVPMacd(Strategy):
     param_space: dict[str, list[Any]] = {}
 
     def validate(self, p: dict[str, Any]) -> None:
+        from nqlab.strategies.spec import REQUIRED_FIELDS
+
         missing = sorted(k for k, v in p.items() if v == UNDECIDED)
+        missing += [f"{k} (omitted from the spec)" for k in REQUIRED_FIELDS["bb_vp_macd"]
+                    if k not in p and k != "variant"]
         if missing:
             raise SpecIncomplete(missing)
         if p.get("variant") not in (None, self.variant):
@@ -99,9 +103,7 @@ class _BBVPMacd(Strategy):
             raise ValueError("partial exits are not supported by the engine yet")
         if int(p.get("orders.max_concurrent_positions", 1)) != 1:
             raise ValueError("the engine supports exactly one concurrent position")
-        if p.get("volume_profile.build_from") == "trades":
-            raise ValueError("volume_profile.build_from=trades needs trades data (Databento); "
-                             "with 1m bars only 'bars' (approximate) is available")
+
 
     def engine_params(self, p, fill_tier):
         be = bool(p["orders.breakeven.enabled"])
@@ -114,6 +116,16 @@ class _BBVPMacd(Strategy):
 
     def sizing(self, p):
         return Sizing(instrument=p["sizing.instrument"], risk_usd=float(p["sizing.risk_per_trade_usd"]))
+
+    def topstep_policy(self, p):
+        """In the Combine simulation the operator sizes from the MLL buffer when he
+        declared a percentage; otherwise from his fixed dollar risk."""
+        from nqlab.risk.topstep import SizingPolicy
+
+        pct = p.get("sizing.risk_pct_of_mll_buffer")
+        if pct not in (None, 0, UNDECIDED):
+            return SizingPolicy.buffer_frac(float(pct))
+        return SizingPolicy.risk_usd(float(p["sizing.risk_per_trade_usd"]))
 
     # ------------------------------------------------------------------------------------
     def _context(self, md, eb, p):
@@ -162,6 +174,7 @@ class _BBVPMacd(Strategy):
                 "composite": "vp_composite", "developing": "vp_developing"}[src]
         if src == "composite":
             kw["n_days"] = int(p["volume_profile.composite_days"])
+        kw["build_from"] = p.get("volume_profile.build_from", "bars")
         f = compute(md, name, **kw)
         return {"VAL": gather(md, eb, f, "vp_val"), "POC": gather(md, eb, f, "vp_poc"), "VAH": gather(md, eb, f, "vp_vah")}
 
@@ -328,3 +341,50 @@ class BBVPMacdTrigger(_BBVPMacd):
     name = "bb_vp_macd_trigger"
     variant = "trigger"
     description = "Operator strategy, trigger variant: MACD cross triggers a market entry near a band/level extreme."
+
+
+class RandomEntrySpecExits(_BBVPMacd):
+    """Baseline (spec 13.2): random entry with the OPERATOR'S exit logic at matched trade
+    frequency. Everything except the entry decision comes from his spec: window, skip
+    days, stop/target definitions, breakeven, time stop, trade caps, sizing. If his
+    strategy cannot beat this, its entries add nothing."""
+
+    name = "random_entry_spec"
+    variant = "any"
+    description = "Random entries (coin-flip side) with the operator's spec exits, matched frequency."
+
+    def validate(self, p):
+        q = dict(p)
+        q["variant"] = self.variant
+        super().validate(q)
+        if not 0 < float(p.get("rate", 0)) <= 5:
+            raise ValueError("rate (expected entries per session, matched to the real strategy) must be in (0, 5]")
+
+    def signals(self, md, eb, p):
+        self.validate(p)
+        need_bands = p["orders.target.type"] in ("opposite_band", "basis")
+        upper, lower, basis = self._bands(md, eb, p) if need_bands else (np.full(eb.n, np.nan),) * 3
+        levels = self._levels(md, eb, p) if (p["orders.stop.type"] == "beyond_level" or p["orders.target.type"] == "poc") \
+            else {k: np.full(eb.n, np.nan) for k in ("VAL", "POC", "VAH")}
+        atr = gather(md, eb, compute(md, "atr", length=14), "atr")
+        w0, w1 = _et_to_ct_minutes(p["orders.window_start_et"]), _et_to_ct_minutes(p["orders.window_end_et"])
+        in_win = (eb.ct_minute >= w0 - 1) & (eb.ct_minute < w1 - 1) & ~self._skip_mask(md, eb, p)
+        side = np.zeros(eb.n, np.int64)
+        from nqlab.strategies.base import session_rng
+
+        for s_, a, b in session_slices(eb):
+            rng = session_rng(int(p.get("seed", 0)), eb.session_dates[s_])
+            idx = np.nonzero(in_win[a:b])[0]
+            if not len(idx):
+                continue
+            prob = float(p["rate"]) / len(idx)
+            draws = rng.random(len(idx))
+            sides = np.where(rng.random(len(idx)) < 0.5, 1, -1)
+            side[a + idx[draws < prob]] = sides[draws < prob]
+        sig = Signals(eb.n)
+        for sd_, band in ((1, lower), (-1, upper)):
+            sdist, tdist = self._stop_target(p, sd_, eb.c.copy(), levels, upper, lower, basis, atr)
+            m = (side == sd_) & ~np.isnan(sdist)
+            sig.place(m, sd_, "market", stop_dist=sdist, target_dist=tdist)
+        sig.exit_now |= eb.ct_minute == _et_to_ct_minutes(p["orders.time_stop_et"]) - 1
+        return sig

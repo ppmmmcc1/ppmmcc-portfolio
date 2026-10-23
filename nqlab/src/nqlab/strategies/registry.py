@@ -31,5 +31,5 @@ def _load() -> None:
 
     for cls in (baselines.ORB, baselines.FirstHalfHourMomentum, baselines.RandomEntry,
                 baselines.SessionHold, baselines.NullFixedTime,
-                bb_vp_macd.BBVPMacdLimit, bb_vp_macd.BBVPMacdTrigger):
+                bb_vp_macd.BBVPMacdLimit, bb_vp_macd.BBVPMacdTrigger, bb_vp_macd.RandomEntrySpecExits):
         register(cls)

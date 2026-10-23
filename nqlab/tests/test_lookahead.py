@@ -119,3 +119,30 @@ def test_bollinger_stdev_types_differ(small_md):
     a = compute(small_md, "bollinger", stdev="population")["bb_upper"]
     b = compute(small_md, "bollinger", stdev="sample")["bb_upper"]
     assert (b.drop_nulls() > a.drop_nulls()).all()
+
+
+def test_profile_from_trades_is_exact_and_causal(small_md):
+    """build_from='trades': exact volume at price, approximate flag off, and truncation-safe."""
+    import datetime as dt
+
+    from nqlab.data.market import MarketData
+
+    b = small_md.bars.filter(pl.col("session_date") <= small_md.sessions["session_date"][8])
+    rows = []
+    for r in b.iter_rows(named=True):
+        for k, px in enumerate((r["open"], r["low"], r["high"], r["close"])):
+            rows.append((r["ts_utc"] + dt.timedelta(seconds=10 + 10 * k), px, 3))
+    trades = pl.DataFrame(rows, schema={"ts_utc": pl.Datetime("us", "UTC"), "price": pl.Float64, "size": pl.Int64},
+                          orient="row")
+    md = MarketData(b, small_md.sessions, "tr", meta={"trades": trades})
+    f = compute(md, "vp_developing", build_from="trades")
+    assert not f["vp_approximate"].any() and f["vp_poc"].drop_nans().len() > 0
+    g = compute(md, "vp_prior_rth", build_from="trades")
+    assert g["vp_poc"].drop_nans().len() > 0
+    k = md.bars.height // 2
+    t = md.truncate(md.bars["ts_close_utc"][k])
+    ft = compute(t, "vp_developing", build_from="trades")
+    a, c = ft["vp_poc"].to_numpy(), f["vp_poc"].head(k + 1).to_numpy()
+    assert ((a == c) | (np.isnan(a) & np.isnan(c))).all()
+    with pytest.raises(ValueError, match="trades"):
+        compute(small_md, "vp_prior_rth", build_from="trades")

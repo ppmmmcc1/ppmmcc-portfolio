@@ -14,7 +14,7 @@ FILLED = {
                 "macd_1h": {"fast": 12, "slow": 26, "signal": 9, "source": "close"}},
     "bollinger": {"timeframe": "1m", "length": 20, "mult": 2.0, "basis": "sma", "stdev": "population",
                   "source": "close", "reprice_each_bar": True},
-    "volume_profile": {"source": "prior_rth", "composite_days": 3, "value_area_pct": 0.7, "bin_size": 0.25,
+    "volume_profile": {"source": "prior_rth", "composite_days": None, "value_area_pct": 0.7, "bin_size": 0.25,
                        "poc_tie": "mid", "build_from": "bars", "align_ticks": 40, "long_levels": ["VAL", "POC"],
                        "short_levels": ["VAH", "POC"], "order_price": "better"},
     "trigger": {"timeframes": ["1m"], "both_within_bars": 3, "cross_definition": "line_cross_signal",
@@ -97,3 +97,48 @@ def test_no_cross_fabricated_across_sessions():
     assert dn.tolist() == [False, False, True, False, False] and up.tolist() == [False] * 4 + [True]
     htf = np.array([1.0, 1.0, 1.0, 3.0, 3.0, 2.0])
     assert np.isnan(_prev_distinct(htf)[0]) and _prev_distinct(htf)[3:].tolist() == [1.0, 1.0, 3.0]
+
+
+def test_lint_flags_omitted_and_invalid_fields(settings, tmp_path):
+    from nqlab.llm.roles import lint_spec
+
+    d = copy.deepcopy(FILLED)
+    d["strategy"] = "bb_vp_macd"
+    del d["bollinger"]["stdev"]                       # silently deleted decision
+    d["context"]["hourly_alignment"] = "clok"         # typo
+    p = tmp_path / "s.yaml"
+    p.write_text(yaml.safe_dump(d))
+    settings.raw["llm"]["enabled"] = False
+    r = lint_spec(settings, p, use_llm=False)
+    fields = {q["field"] for q in r["questions"]}
+    assert "bollinger.stdev" in fields and "context.hourly_alignment" in fields and not r["runnable"]
+    filled = copy.deepcopy(FILLED)
+    filled["strategy"] = "bb_vp_macd"
+    p.write_text(yaml.safe_dump(filled))
+    assert lint_spec(settings, p, use_llm=False)["runnable"]
+
+
+def test_omitted_field_refused_at_run(small_md, session_settings):
+    p = params()
+    del p["bollinger.stdev"]
+    with pytest.raises(SpecIncomplete, match="omitted"):
+        run_backtest(small_md, "bb_vp_macd_limit", p, session_settings)
+
+
+def test_random_entry_with_operator_exits(small_md, session_settings):
+    p = params(rate=1.0, seed=3)
+    r = run_backtest(small_md, "random_entry_spec", p, session_settings)
+    assert r.trades.height > 20
+    assert (r.trades["stop_dist"] == 10.0).all()                       # his 40-tick stop
+    assert np.allclose(r.trades["target_dist"].to_numpy(), 15.0)       # his 1.5R target
+    et = (r.trades["entry_ct_minute"] + 60).to_numpy()
+    assert et.min() >= 9 * 60 + 30 and et.max() <= 10 * 60 + 30         # his window
+
+
+def test_topstep_sizing_uses_buffer_pct():
+    from nqlab.risk.topstep import SZ_BUFFER_FRAC, SZ_RISK_USD
+    from nqlab.strategies.registry import get_strategy
+
+    st = get_strategy("bb_vp_macd_limit")
+    assert st.topstep_policy(params()).mode == SZ_BUFFER_FRAC
+    assert st.topstep_policy(params(**{"sizing.risk_pct_of_mll_buffer": 0})).mode == SZ_RISK_USD

@@ -76,6 +76,29 @@ class DataStore:
         self.parquet.mkdir(parents=True, exist_ok=True)
         (self.parquet / "manifest.json").write_text(json.dumps(manifest, indent=2, default=str), encoding="utf-8")
 
+    def write_ticks(self, schema: str, df: pl.DataFrame) -> dict[str, int]:
+        """Tick data (Databento trades / mbo). Rows on or after the lockbox boundary go to
+        the holdout folder, never to the research store."""
+        from nqlab.calendar.sessions import session_date_expr
+        import datetime as _dt
+
+        lb = self.lockbox()
+        hstart = _dt.date.fromisoformat(lb["holdout_start"]) if lb else None
+        df = df.with_columns(session_date_expr().alias("_sd"))
+        research = df.filter(pl.col("_sd") < hstart) if hstart else df
+        hold = df.filter(pl.col("_sd") >= hstart) if hstart else df.clear()
+        self._write_partitioned(self.parquet / schema, research.drop("_sd"))
+        if hold.height:
+            with _ingest_write_access():
+                self._write_partitioned(self.holdout / schema, hold.drop("_sd"))
+        return {"research_rows": research.height, "holdout_rows": hold.height}
+
+    def has_ticks(self, schema: str) -> bool:
+        return any((self.parquet / schema).glob("*/part.parquet")) if (self.parquet / schema).exists() else False
+
+    def scan_ticks(self, schema: str) -> pl.LazyFrame:
+        return self._scan(self.parquet / schema)
+
     # ---- lockbox boundary ------------------------------------------------------------
     def lockbox(self) -> dict[str, Any] | None:
         if self.lockbox_file.exists():

@@ -103,3 +103,18 @@ def test_per_contract_volume_roll(settings):
     after = series.filter(pl.col("session_date") >= r["roll_session"]).head(1)
     assert after["close"][0] - before["close"][0] > 30
     assert abs(after["open_badj"][0] - before["close_badj"][0]) < 30
+
+
+def test_cross_check_bars_vs_trades(small_md):
+    from nqlab.data.quality import cross_check_trades
+
+    b = small_md.bars.filter(pl.col("session_date") == small_md.sessions["session_date"][3])
+    rows = []
+    for r in b.iter_rows(named=True):
+        for k, px in enumerate((r["open"], r["low"], r["high"], r["close"])):
+            rows.append((r["ts_utc"] + dt.timedelta(seconds=5 + 10 * k), px, r["volume"] // 4 + (1 if k == 0 else 0) * (r["volume"] % 4)))
+    tr = pl.DataFrame(rows, schema={"ts_utc": pl.Datetime("us", "UTC"), "price": pl.Float64, "size": pl.Int64}, orient="row")
+    ok = cross_check_trades(b, tr)
+    assert ok["bars_compared"] == b.height and ok["price_disagreements"] == 0 and ok["volume_disagreements"] == 0
+    bad = tr.with_columns(pl.when(pl.int_range(pl.len()) == 41).then(pl.col("price") + 5).otherwise(pl.col("price")).alias("price"))
+    assert cross_check_trades(b, bad)["price_disagreements"] == 1

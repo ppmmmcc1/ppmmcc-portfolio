@@ -54,6 +54,7 @@ nqlab run orb_v1 --auto --workers auto  # stages 1-6, stops at the first gate th
 nqlab promote orb_v1                    # only after a PASS; refused otherwise
 nqlab holdout orb_v1 --confirm          # stage 7: ONE look, recorded permanently
 nqlab ledger stats                      # N, the number every DSR is deflated by
+nqlab rank                              # families ranked by P(first payout), never by Sharpe
 ```
 
 Every run, including errored and abandoned ones and every LLM-generated variant, goes
@@ -71,6 +72,14 @@ nqlab spec lint specs\bb_vp_macd.yaml   # lists the open decisions as questions
 nqlab parity label 2024-03-05 09:47 long  # label 20-30 sessions by hand ...
 nqlab parity compare orb_v1               # ... and see where the code disagrees with you
 ```
+
+Once the spec is filled in, register `random_entry_spec` with the same spec values plus
+`rate` (your strategy's trades per session): random entries with **your** exits, window
+and skip days. If your strategy cannot beat it, its entries add nothing.
+
+LLM variants (`nqlab llm variants <family>`) are reserved in the ledger the moment they
+are generated; register one with `nqlab preregister <llmv_id> --from-draft
+research_log\hypotheses\<llmv_id>.yaml` so it keeps those reserved trial keys.
 
 The limit-with-confirmation and cross-as-trigger readings are different strategies
 (`variant: limit` / `variant: trigger`); register and test them separately. Any field
@@ -159,6 +168,11 @@ bars (volume-based rolls), trades (tier 3 queue model, exact volume profile) and
 3. `nqlab data ingest`. **The cost of every request is estimated and printed before
    anything is downloaded**; requests above `max_cost_usd` are refused unless you add
    `--confirm-cost`.
+4. Tick data for the queue/MBO fill tiers and exact volume profiles:
+   `nqlab data ingest-ticks --schema trades --start 2024-01-02 --end 2024-03-29` (and
+   `--schema mbo` for tier 4). Trades are cross-checked against your 1-minute bars and
+   every disagreement is reported. Then `nqlab fills-calibrate <family>` compares tiers
+   1-4 on ~200 sampled sessions (09:25-10:45 ET), and every report adds tier 3/4 rows.
 
 The holdout boundary set by your first ingest does not move when the data source
 changes.
@@ -182,5 +196,7 @@ changes.
 - A pre-spliced continuous CSV hides roll dates and gaps; indicators with lookbacks
   across a roll may be contaminated on roll days. Per-contract data fixes this.
 - One position at a time; no partial exits yet.
+- Windows behaviour is exercised by `.github/workflows/nqlab.yml` (fast suite on
+  `windows-latest` on every change to `nqlab/`; slow suite on manual dispatch).
 - The engine resolves a bar that touches both stop and target as a loss. That is the
   right default for a 1-minute backtest, and it is why tick data matters.

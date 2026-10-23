@@ -41,7 +41,7 @@ def engine_bars_for(md, settings: Settings, start_ct: int) -> EngineBars:
 
 def make_run_id(strategy: str, params: dict, data_version: str, fill_tier: int, settings: Settings) -> str:
     return stable_hash({
-        "s": strategy, "p": params, "d": data_version, "f": fill_tier,
+        "s": strategy, "sv": get_strategy(strategy).version, "p": params, "d": data_version, "f": fill_tier,
         "cost": settings.section("costs"), "slip": settings.section("slippage"),
         "rules": settings.topstep_rules, "v": 1,
     })

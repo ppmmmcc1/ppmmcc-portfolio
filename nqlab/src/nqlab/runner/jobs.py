@@ -128,7 +128,8 @@ def job_morning_summary(settings, job, queue, n_jobs):
 
     batch = job.get("batch")
     jobs = [j for j in queue.list() if j.get("batch") == batch and j["job_id"] != job["job_id"]]
-    facts = [{"job": j["job_id"], "type": j["type"], "status": j["status"], "error": (j["error"] or "")[:300],
+    facts = [{"job": j["payload"].get("family_id") or j["payload"].get("strategy") or j["job_id"], "type": j["type"],
+              "status": j["status"], "error": (j["error"] or "")[:300],
               "result": json.loads(j["result_json"]) if j["result_json"] else None} for j in jobs]
     path = morning_summary(settings, facts, batch=batch)
     return {"summary": str(path)}

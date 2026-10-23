@@ -15,14 +15,16 @@ Order of events within bar i
 
 Fill rules (tier 1 = touch, tier 2 = trade-through, `through` = 0 or 1 tick)
 --------------------------------------------------------------------------
-* Limit buy at P fills when low <= P - through. If open <= P - through it filled at the
-  open (gap), otherwise at P. Sells mirror.
+* Limit buy at P fills when low <= P - through, AT P: a resting order never gets price
+  improvement, even when the bar opens through it. Only an order that was already
+  marketable when submitted (previous close at least a tick through P) takes the open.
+  Sells mirror.
 * Stop buy at P triggers when high >= P; fills at max(open, P) + slippage.
 * Market fills at the next bar's open + slippage.
 * Stop-limit: triggers like a stop; fills at max(open, P) if that is <= limit, else
   rests as a limit at the limit price from the next bar.
 * Exits: stop fills at the stop (or the open, if gapped through) minus slippage; target
-  fills like a limit (trade-through for tier 2).
+  fills like a resting limit, at the target (trade-through for tier 2).
 * Ambiguous bar: if a bar touches both stop and target, the STOP filled first. Counted.
 * Entry bar: after a limit fill intrabar, the bar's high may have printed BEFORE the
   fill, so the target is not allowed to fill on the entry bar; the stop is (price had to
@@ -44,20 +46,28 @@ K_OPEN, K_LIMIT, K_STOP = 0, 1, 2   # how the entry filled (for entry-bar rules)
 
 
 @nb.njit(cache=True)
-def _fill_entry(side, typ, px, lim, o, h, l, through, tick, slip):
-    """Return (filled, fill_price, kind, new_type_if_converted). side=+1 buy, -1 sell."""
+def _fill_entry(side, typ, px, lim, o, h, l, through, tick, slip, c_sub):
+    """Return (filled, fill_price, kind, new_type_if_converted). side=+1 buy, -1 sell.
+    ``c_sub`` is the close of the bar at whose close the order was submitted."""
     if typ == MARKET:
         return True, o + side * slip * tick, K_OPEN, typ
     if typ == LIMIT:
+        # marketable on arrival (price already through the limit when submitted): it
+        # takes the market at the next open, never worse than the limit
+        marketable = (c_sub <= px - tick) if side > 0 else (c_sub >= px + tick)
+        if marketable and ((side > 0 and o <= px) or (side < 0 and o >= px)):
+            return True, o, K_OPEN, typ
+        # resting: fills at ITS OWN price, even if the bar opens through it (no free
+        # price improvement); an open through the limit makes the whole bar post-fill
         thr = px - side * through
         if side > 0:
             if o <= thr:
-                return True, o, K_OPEN, typ
+                return True, px, K_OPEN, typ
             if l <= thr:
                 return True, px, K_LIMIT, typ
         else:
             if o >= thr:
-                return True, o, K_OPEN, typ
+                return True, px, K_OPEN, typ
             if h >= thr:
                 return True, px, K_LIMIT, typ
         return False, 0.0, 0, typ
@@ -179,9 +189,9 @@ def run_kernel(o, h, l, c, sess, slip, force_flat, entry_ok,
             f0, px0, k0, nt0 = (False, 0.0, 0, p_type[0])
             f1, px1, k1, nt1 = (False, 0.0, 0, p_type[1])
             if p_type[0] != NONE:
-                f0, px0, k0, nt0 = _fill_entry(1, p_type[0], p_px[0], p_lim[0], o[i], h[i], l[i], through, tick, slip[i])
+                f0, px0, k0, nt0 = _fill_entry(1, p_type[0], p_px[0], p_lim[0], o[i], h[i], l[i], through, tick, slip[i], c[p_at[0]])
             if p_type[1] != NONE:
-                f1, px1, k1, nt1 = _fill_entry(-1, p_type[1], p_px[1], p_lim[1], o[i], h[i], l[i], through, tick, slip[i])
+                f1, px1, k1, nt1 = _fill_entry(-1, p_type[1], p_px[1], p_lim[1], o[i], h[i], l[i], through, tick, slip[i], c[p_at[1]])
             both = f0 and f1
             pick = -1
             if both:
@@ -306,14 +316,14 @@ def _exit_check(pos, stop_px, tgt_px, o, h, l, through, tick, slip, allow_stop, 
         if has_stop and o <= stop_px:
             return True, o - slip * tick, R_STOP, False
         if has_tgt and o >= tgt_px + through:
-            return True, o, R_TARGET, False
+            return True, tgt_px, R_TARGET, False      # resting target: its own price, not the open
         s_hit = has_stop and l <= stop_px
         t_hit = has_tgt and h >= tgt_px + through
     else:
         if has_stop and o >= stop_px:
             return True, o + slip * tick, R_STOP, False
         if has_tgt and o <= tgt_px - through:
-            return True, o, R_TARGET, False
+            return True, tgt_px, R_TARGET, False
         s_hit = has_stop and h >= stop_px
         t_hit = has_tgt and l <= tgt_px - through
     if s_hit and t_hit:

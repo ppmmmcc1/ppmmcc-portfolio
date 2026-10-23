@@ -47,12 +47,31 @@ def test_limit_trade_through_fills_tier2():
     assert r["entry_price"] == 100.0
 
 
-def test_limit_gap_fills_at_open():
+def test_resting_limit_gets_no_price_improvement_on_gap():
+    """Resting buy at 100 (submitted with price at 101); the next bar OPENS at 99. A
+    resting order is filled at its own price (100), not at the better open."""
     eb = make_bars([(101, 101.5, 100.5, 101), (99.0, 99.5, 98.75, 99.25), (99.25, 99.5, 99, 99)], slip=0)
     sig = Signals(eb.n)
     sig.place(np.array([True, False, False]), +1, "limit", price=100.0, stop_dist=5.0)
     r = one(simulate(eb, sig, EngineParams(fill_tier=2)))
-    assert r["entry_price"] == 99.0 and r["entry_type"] == "at_open"
+    assert r["entry_price"] == 100.0 and r["entry_type"] == "at_open"
+
+
+def test_marketable_limit_takes_the_open():
+    """Buy limit at 100 submitted when price is already 99 (marketable): fills at the open."""
+    eb = make_bars([(99, 99.5, 98.5, 99), (99.25, 99.5, 99.0, 99.25), (99.25, 99.5, 99, 99)], slip=0)
+    sig = Signals(eb.n)
+    sig.place(np.array([True, False, False]), +1, "limit", price=100.0, stop_dist=5.0)
+    r = one(simulate(eb, sig, EngineParams(fill_tier=2)))
+    assert r["entry_price"] == 99.25 and r["entry_type"] == "at_open"
+
+
+def test_target_gap_fills_at_target_not_open():
+    eb = make_bars([(100, 100.5, 99.5, 100), (100, 100.5, 99.75, 100), (106, 107, 105.5, 106.5)], slip=0)
+    sig = Signals(eb.n)
+    sig.place(np.array([True, False, False]), +1, "market", stop_dist=2.0, target_dist=3.0)
+    r = one(simulate(eb, sig, EngineParams(fill_tier=2)))
+    assert r["exit_reason"] == "target" and r["exit_price"] == 103.0
 
 
 def test_bracket_both_legs_touched_stop_first():

@@ -194,7 +194,8 @@ def stage_deflate(ctx: FamilyContext) -> StageResult:
         return StageResult(5, FAIL, f"Deflated Sharpe {ds['dsr']:.2f} < {ctx.crit['dsr_min']} after {n_trials} trials "
                            "in the ledger: the result is consistent with the best of many lucky tries.", d)
     if not pb["pbo"] < ctx.crit["pbo_max"]:
-        return StageResult(5, FAIL, f"Probability of backtest overfitting {pb['pbo']:.2f} >= {ctx.crit['pbo_max']}.", d)
+        worse = " Above 0.5 the selection process is worse than picking a config at random." if pb["pbo"] > 0.5 else ""
+        return StageResult(5, FAIL, f"Probability of backtest overfitting {pb['pbo']:.2f} >= {ctx.crit['pbo_max']}.{worse}", d)
     t = m["t_stat_r"]
     if not np.isfinite(t):        # no stop -> R undefined: use the t-stat of daily P&L instead
         dp = fm.pnl[:, i]
@@ -219,7 +220,7 @@ def stage_propsim(ctx: FamilyContext) -> StageResult:
     tape = TradeTape.from_backtest(r.trades, r.daily, spec.point_value, spec.tick_value,
                                    ctx.settings.round_turn_cost(sz.instrument))
     rules = AccountRules.from_config(ctx.settings.topstep_rules, sz.instrument)
-    policy = SizingPolicy.risk_usd(sz.risk_usd) if sz.risk_usd else SizingPolicy.fixed(sz.contracts)
+    policy = strat.topstep_policy(cfg)
     ts = ctx.settings.section("topstep")
     n_paths = int(ctx.settings.section("validation")["bootstrap"]["n_paths"])
     hist = historical_combines(tape, rules, policy, ts["combine_horizon_sessions"], ts["xfa_horizon_sessions"])

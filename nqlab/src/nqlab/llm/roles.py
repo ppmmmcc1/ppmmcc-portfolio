@@ -61,11 +61,20 @@ def _question_for(field: str) -> str:
 
 
 def lint_spec(settings, spec_path: Path, use_llm: bool = True) -> dict[str, Any]:
-    from nqlab.strategies.spec import flatten, load_spec, undecided
+    from nqlab.strategies.spec import flatten, invalid_values, load_spec, missing_fields, undecided
 
     spec = load_spec(spec_path)
     flat = flatten(spec)
     questions = [{"field": f, "question": _question_for(f), "source": "code"} for f in undecided(spec)]
+    missing = missing_fields(spec, str(spec.get("strategy", "bb_vp_macd")))
+    for f in missing:
+        questions.append({"field": f, "source": "code",
+                          "question": f"`{f}` is missing from the spec entirely. Deleting a field does not make the "
+                                      f"decision go away: {_question_for(f)}"})
+    bad = invalid_values(spec)
+    for f, v, allowed in bad:
+        questions.append({"field": f, "source": "code",
+                          "question": f"`{f}` = {v!r} is not one of {list(allowed)}. Which did you mean?"})
     # deterministic contradiction checks
     contra = []
     if flat.get("variant") == "limit" and flat.get("bollinger.reprice_each_bar") is False and flat.get("orders.cancel_if_band_moves_ticks") in (None, 0):
@@ -90,8 +99,9 @@ def lint_spec(settings, spec_path: Path, use_llm: bool = True) -> dict[str, Any]
             pass
     for q in llm_qs:
         questions.append({"field": "(llm)", "question": q, "source": "llm"})
-    return {"spec": str(spec_path), "n_undecided": len(undecided(spec)), "questions": questions,
-            "runnable": len(undecided(spec)) == 0 and not contra}
+    return {"spec": str(spec_path), "n_undecided": len(undecided(spec)), "n_missing": len(missing),
+            "n_invalid": len(bad), "questions": questions,
+            "runnable": len(undecided(spec)) == 0 and not contra and not missing and not bad}
 
 
 # ---------------------------------------------------------------------------------------
@@ -106,6 +116,8 @@ def trade_context(md, trades, settings, n: int = 20) -> list[dict[str, Any]]:
     worst = trades.sort("pnl_usd").head(n)
     atr = compute(md, "atr", length=14)["atr"].to_numpy()
     h15 = compute(md, "htf_macd", tf=15)["m15_macd_hist"].to_numpy()
+    vp = compute(md, "vp_prior_rth", build_from="trades" if md.meta.get("trades") is not None else "bars")
+    lv = np.vstack([vp["vp_poc"].to_numpy(), vp["vp_vah"].to_numpy(), vp["vp_val"].to_numpy()])
     ts = md.bars["ts_utc"].dt.epoch("us").to_numpy()
     sess = md.sessions.select("session_date", "is_fomc", "is_release_0830", "is_release_1000")
     flags = {r["session_date"]: r for r in sess.iter_rows(named=True)}
@@ -119,6 +131,8 @@ def trade_context(md, trades, settings, n: int = 20) -> list[dict[str, Any]]:
                     "r": None if r["r_multiple"] is None or not np.isfinite(r["r_multiple"]) else round(r["r_multiple"], 2),
                     "mae_pts": r["mae_points"], "mfe_pts": r["mfe_points"], "exit": r["exit_reason"],
                     "atr_1m_pts": round(float(atr[i]), 2) if i >= 0 and np.isfinite(atr[i]) else None,
+                    "dist_to_prior_rth_level_pts": (round(float(np.nanmin(np.abs(lv[:, i] - r["entry_price"]))), 2)
+                                                    if i >= 0 and np.isfinite(lv[:, i]).any() else None),
                     "m15_hist_sign": int(np.sign(h15[i])) if i >= 0 and np.isfinite(h15[i]) else None,
                     "fomc": bool(f.get("is_fomc")), "release_0830": bool(f.get("is_release_0830")),
                     "release_1000": bool(f.get("is_release_1000"))})
