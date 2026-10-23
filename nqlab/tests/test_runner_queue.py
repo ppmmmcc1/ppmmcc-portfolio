@@ -52,9 +52,9 @@ def test_kill_midrun_resumes_from_checkpoint(settings, ingested):
     # persist the faster checkpoint cadence for the worker subprocess
     import yaml
     p = settings.root / "config" / "settings.yaml"
-    raw = yaml.safe_load(p.read_text())
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
     raw["validation"]["mcpt"]["checkpoint_every"] = 5
-    p.write_text(yaml.safe_dump(raw))
+    p.write_text(yaml.safe_dump(raw), encoding="utf-8")
     store = FamilyStore(settings)
     pre = make_prereg(settings, "kill_v1", "null_fixed_time", "junk family for the kill test",
                       param_space={"stop_ticks": [20, 40]}, fixed={"seed": 1, "entry_minute": 520})

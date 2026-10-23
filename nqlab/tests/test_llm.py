@@ -61,7 +61,7 @@ def test_everything_runs_with_ollama_down(settings):
     assert r["n_undecided"] > 40 and not r["runnable"]
     assert all(q["source"] == "code" for q in r["questions"])
     p = roles.morning_summary(settings, [{"job": "j1", "type": "backtest", "status": "done", "error": "", "result": {}}], "20990101")
-    assert "deterministic" in p.read_text()
+    assert "deterministic" in p.read_text(encoding="utf-8")
     assert roles.generate_variants(settings, "orb", {"or_minutes": [5, 15]}, {}, 3)["variants"] == []
 
 
@@ -95,21 +95,21 @@ def test_variants_ledgered_at_generation(settings, fake_ollama):
 def test_morning_summary_numbers_come_from_code(settings, fake_ollama):
     fake_ollama("ORB failed screening with expectancy -6.68. ORB had a Sharpe of 3.1. You should trade ORB.")
     facts = [{"job": "orb", "type": "family", "status": "done", "error": "", "result": {"expectancy": -6.68}}]
-    text = roles.morning_summary(settings, facts, "20990102").read_text()
+    text = roles.morning_summary(settings, facts, "20990102").read_text(encoding="utf-8")
     assert "-6.68" in text and "3.1" not in text and "You should trade" not in text
 
 
 def test_postmortem_writes_draft_with_noise_line(settings, fake_ollama):
     fake_ollama("Hypothesis: losers cluster on release days.")
     p = roles.postmortem(settings, "fam", [{"date": "2024-01-02", "pnl_usd": -100.0}])
-    assert p.parent.name == "hypotheses" and roles.NOISE_LINE in p.read_text()
+    assert p.parent.name == "hypotheses" and roles.NOISE_LINE in p.read_text(encoding="utf-8")
 
 
 def test_every_llm_call_logged(settings, fake_ollama):
     fake_ollama("Is X defined?")
     roles.lint_spec(settings, settings.path("specs") / "bb_vp_macd.yaml")
     logs = list((settings.path("research_log") / "llm").glob("*_spec_lint.json"))
-    assert logs and json.loads(logs[0].read_text())["model"] == "qwen2.5:7b-instruct"
+    assert logs and json.loads(logs[0].read_text(encoding="utf-8"))["model"] == "qwen2.5:7b-instruct"
 
 
 def test_llm_draft_registers_with_reserved_keys(settings, fake_ollama):

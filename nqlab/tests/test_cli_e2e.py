@@ -24,10 +24,10 @@ def nq(root, *args, ok=True):
 @pytest.fixture()
 def project(settings):
     p = settings.root / "config" / "settings.yaml"
-    raw = yaml.safe_load(p.read_text())
+    raw = yaml.safe_load(p.read_text(encoding="utf-8"))
     raw["validation"]["bootstrap"]["n_paths"] = 300
     raw["llm"]["base_url"] = "http://127.0.0.1:9"
-    p.write_text(yaml.safe_dump(raw))
+    p.write_text(yaml.safe_dump(raw), encoding="utf-8")
     bars = random_walk_bars(settings, dt.date(2023, 1, 3), dt.date(2023, 12, 29), seed=5, rth_only=True)
     et = bars.with_columns(pl.col("ts_utc").dt.convert_time_zone("America/New_York").dt.strftime("%Y-%m-%d %H:%M:%S").alias("timestamp"))
     et.select("timestamp", "open", "high", "low", "close", "volume").write_csv(settings.path("data_raw") / "nq.csv")
@@ -39,7 +39,7 @@ def test_cli_round_trip(project):
     assert "LOCKED in the holdout" in out
     nq(project, "data", "quality")
     r = nq(project, "backtest", "session_hold", "--no-diag").stdout
-    html = next((project / "reports").glob("session_hold.html")).read_text()
+    html = next((project / "reports").glob("session_hold.html")).read_text(encoding="utf-8")
     assert "INSUFFICIENT" in html or "FAIL" in html           # a single backtest is never PASS
     assert "A zero-edge trader passes this Combine roughly 40% of the time" in html
     assert "Tier 1 touch (optimistic upper bound only)" in html
@@ -57,5 +57,5 @@ def test_cli_round_trip(project):
     # editing a locked pre-registration voids the family
     pre = project / "research_log" / "orb_t.yaml"
     os.chmod(pre, 0o644)
-    pre.write_text(pre.read_text().replace("Opening range breakouts continue.", "Something else entirely."))
+    pre.write_text(pre.read_text(encoding="utf-8").replace("Opening range breakouts continue.", "Something else entirely."))
     assert "modified after it was locked" in nq(project, "promote", "orb_t", ok=False).stdout

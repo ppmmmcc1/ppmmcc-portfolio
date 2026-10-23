@@ -107,14 +107,14 @@ def test_lint_flags_omitted_and_invalid_fields(settings, tmp_path):
     del d["bollinger"]["stdev"]                       # silently deleted decision
     d["context"]["hourly_alignment"] = "clok"         # typo
     p = tmp_path / "s.yaml"
-    p.write_text(yaml.safe_dump(d))
+    p.write_text(yaml.safe_dump(d), encoding="utf-8")
     settings.raw["llm"]["enabled"] = False
     r = lint_spec(settings, p, use_llm=False)
     fields = {q["field"] for q in r["questions"]}
     assert "bollinger.stdev" in fields and "context.hourly_alignment" in fields and not r["runnable"]
     filled = copy.deepcopy(FILLED)
     filled["strategy"] = "bb_vp_macd"
-    p.write_text(yaml.safe_dump(filled))
+    p.write_text(yaml.safe_dump(filled), encoding="utf-8")
     assert lint_spec(settings, p, use_llm=False)["runnable"]
 
 

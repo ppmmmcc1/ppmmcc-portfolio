@@ -66,7 +66,7 @@ def test_holdout_unreachable_outside_command(settings, ingested):
 
 
 def test_lockbox_boundary_never_moves(settings, ingested):
-    lb = json.loads((settings.path("parquet").parent / "lockbox.json").read_text())
+    lb = json.loads((settings.path("parquet").parent / "lockbox.json").read_text(encoding="utf-8"))
     r2 = ingest(settings)
     assert r2.holdout_start.isoformat() == lb["holdout_start"]
 

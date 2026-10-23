@@ -19,6 +19,7 @@ py -3.12 -m venv .venv            # Python 3.11 or 3.12
 pip install -e ".[dev]"
 pytest                            # fast suite (about 3 minutes)
 pytest -m slow                    # null calibration + kill/resume (about 10 minutes)
+setx PYTHONUTF8 1                 # optional: UTF-8 everywhere regardless of the code page
 ```
 
 Ollama is optional. If it is running at `http://localhost:11434`, nqlab picks an
