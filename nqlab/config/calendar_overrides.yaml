@@ -1,0 +1,4 @@
+# Manual overrides layered on top of pandas_market_calendars CME_Equity.
+# closed: sessions to treat as fully closed.  early_close: date -> close time (CT).
+closed: []
+early_close: {}

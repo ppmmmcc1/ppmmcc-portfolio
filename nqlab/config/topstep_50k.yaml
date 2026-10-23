@@ -1,0 +1,48 @@
+# Topstep Trading Combine 50K + Express Funded Account (XFA) rules.
+# These are DATA, never constants in code. Topstep changes them.
+# VERIFY against the Topstep Help Center before trusting any output.
+rules_version: "2026-10 (unverified)"
+verify_note: >
+  Values below were transcribed for late 2026 and have NOT been verified against
+  Topstep's Help Center. The consistency threshold in particular is reported as 0.50 by
+  some sources and 0.55 by others.
+
+combine:
+  account_size: 50000
+  profit_target: 3000
+  max_loss_limit:
+    amount: 2000
+    trails: end_of_day_balance_highs   # never moves down
+    locks_at: 50000                    # MLL stops trailing here ...
+    lock_trigger_balance: 52000        # ... once EOD balance >= this
+    enforced: real_time                # INCLUDING unrealized P&L
+  daily_loss_limit:
+    enabled: false                     # optional, chosen at purchase, carries to funded
+    amount: 1000
+  consistency:
+    best_day_max_pct: 0.55             # some sources say 0.50; flagged in every report
+  max_contracts: {minis: 5, micros: 50}
+  flatten_deadline_ct: "15:10"
+
+xfa:
+  starting_balance: 0
+  max_loss_limit:
+    amount: 2000                       # MLL starts at -2000
+    trails: end_of_day_balance_highs
+    locks_at: 0
+    reset_to_after_first_payout: 0
+  payout_split: 0.90
+  min_payout: 125
+  path: standard                       # standard | consistency
+  standard:
+    winning_days_required: 5
+    winning_day_min: 150
+    max_pct_of_balance: 0.50
+    max_payout: 2000
+  consistency_path:
+    min_trading_days: 3
+    best_day_max_pct: 0.40
+    max_payout: 3000
+  daily_loss_limit:
+    enabled: false
+    amount: 1000

@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nqlab"
+version = "0.1.0"
+description = "Statistically honest backtesting for intraday NQ/MNQ futures with Topstep rule simulation"
+requires-python = ">=3.11"
+dependencies = [
+  "polars", "pyarrow", "duckdb", "numpy", "numba", "scipy", "statsmodels", "arch",
+  "pandas", "pandas_market_calendars", "pydantic>=2", "typer", "rich",
+  "plotly", "jinja2", "joblib", "httpx", "pyyaml",
+  "yfinance", "databento",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "hypothesis"]
+
+[project.scripts]
+nqlab = "nqlab.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+nqlab = ["results/templates/*.j2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -m 'not slow'"
+markers = [
+  "slow: long-running statistical tests (null calibration, MCPT)",
+]

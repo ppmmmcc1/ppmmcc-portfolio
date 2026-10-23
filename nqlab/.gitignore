@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+*.egg-info/
+# Market data and results are local-only (large, and licensed per source)
+data/raw/*
+data/parquet/*
+data/holdout/*
+!data/raw/.gitkeep
+!data/parquet/.gitkeep
+!data/holdout/.gitkeep
+results/
+reports/
+research_log/llm/*
+!research_log/llm/.gitkeep

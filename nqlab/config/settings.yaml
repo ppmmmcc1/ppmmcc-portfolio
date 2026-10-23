@@ -1,0 +1,112 @@
+# nqlab settings. Paths are relative to the project root (the folder holding config/).
+
+paths:
+  data_raw: data/raw
+  parquet: data/parquet
+  holdout: data/holdout
+  results_db: results/nqlab.duckdb
+  queue_db: results/queue.sqlite
+  reports: reports
+  research_log: research_log
+  specs: specs
+  events: config/events.yaml
+  calendar_overrides: config/calendar_overrides.yaml
+
+data:
+  source: csv                 # csv | yfinance | databento  (upgrade = change this line)
+  root_symbol: NQ
+  holdout_months: 6
+  csv:
+    pattern: "*.csv"
+    # Map canonical column -> header in your CSV. Header matching is case-insensitive.
+    # If date and time are separate columns, list both under `timestamp` and they are
+    # joined with a space before parsing.
+    columns:
+      timestamp: [timestamp]
+      open: open
+      high: high
+      low: low
+      close: close
+      volume: volume
+      symbol: null            # column holding the contract (e.g. NQZ25), or null
+    timestamp_format: null    # strptime format, or null to auto-detect
+    source_timezone: America/New_York   # timezone the CSV timestamps are written in
+    bar_label: open           # open | close : does the timestamp mark the bar's start or end?
+    contract_symbol_default: NQ_CONT    # used when the CSV has no contract column
+  yfinance:
+    ticker: "NQ=F"
+  databento:
+    dataset: GLBX.MDP3
+    symbols: ["NQ.FUT"]        # parent symbology: every NQ contract (enables the volume roll)
+    stype_in: parent
+    max_cost_usd: 50.0        # refuse any single download estimated above this
+  roll:
+    method: volume            # volume | cme_convention (fallback if no per-contract volume)
+    cme_days_before_expiry: 8 # Thursday 8 calendar days before the 3rd-Friday expiry
+
+contracts:
+  NQ:  {tick_size: 0.25, tick_value: 5.00, point_value: 20.0}
+  MNQ: {tick_size: 0.25, tick_value: 0.50, point_value: 2.0}
+micros_per_mini: 10
+
+costs:
+  # TopstepX commissions + fees, per contract, round turn
+  round_turn: {NQ: 3.78, MNQ: 1.22}
+
+slippage:
+  # Ticks of adverse slippage on stop and market fills. Limit fills get zero slippage
+  # (their cost is non-fills and adverse selection, captured by the fill tier).
+  default_rth_ticks: 1
+  overnight_ticks: 2
+  open_first_minute_ticks: 3   # first 1m bar after 09:30 ET
+  release_ticks: 3             # 08:30 / 10:00 ET release bars (+1 bar after)
+  fomc_day_ticks: 2            # all RTH bars on FOMC days
+  fomc_announcement_ticks: 4   # 13:00-13:05 CT on FOMC days
+
+fill:
+  default_tier: 2              # 1 = touch (optimistic), 2 = trade-through (headline)
+  queue_cancel_haircut: 0.3    # tier 3: fraction of queue ahead assumed to cancel
+
+engine:
+  ambiguous_warn_fraction: 0.15
+  random_seed: 20240101
+
+calendar:
+  timezone: America/Chicago
+  rth_open: "08:30"
+  rth_close: "15:00"
+  globex_open: "17:00"
+  globex_close: "16:00"
+  early_close_flatten_minutes_before: 5
+
+validation:
+  walk_forward: {train_sessions: 120, test_sessions: 20, step_sessions: 20}
+  cpcv: {n_groups: 10, k_test: 2, embargo_sessions: 1}
+  pbo: {n_blocks: 16}
+  mcpt: {n_permutations: 1000, checkpoint_every: 25, tod_bucket_minutes: 30}
+  spa: {reps: 1000, block_size: 5}
+  bootstrap: {n_paths: 10000}
+  gates:
+    mcpt_p_max: 0.05
+    dsr_min: 0.95
+    pbo_max: 0.20
+    wfe_min: 0.5
+    min_trades: 100            # below this a verdict is INSUFFICIENT DATA
+    min_sessions: 120
+    family_t_stat: 3.0         # Harvey-Liu-Zhu bar when chosen from a family
+
+topstep:
+  rules_file: config/topstep_50k.yaml
+  combine_horizon_sessions: 250
+  xfa_horizon_sessions: 250
+
+llm:
+  enabled: true
+  base_url: http://localhost:11434
+  timeout_s: 120
+  preferred_size_b: [7, 14]   # prefer instruct models in this parameter range
+  max_variants_per_session: 20
+
+runner:
+  workers: auto               # auto = cpu_count - 1
+  max_worker_memory_mb: 2000

@@ -1,0 +1,100 @@
+# The operator's strategy: Bollinger extremes at volume-profile levels, filtered by
+# 15m/1h MACD context, triggered/confirmed by a 1m/5m MACD cross.
+#
+# INCOMPLETE BY DESIGN. Every field marked REQUIRED_UNDECIDED is a decision the operator
+# has not made. nqlab refuses to run this spec until each one is filled, and
+# `nqlab spec lint specs/bb_vp_macd.yaml` lists them as questions. Do NOT fill them with
+# "reasonable defaults": a default is a decision, and an undeclared decision is a hidden
+# degree of freedom. Any leaf may be a LIST of values: that declares a grid dimension up
+# front for pre-registration (every combination counts as a trial).
+#
+# `variant` selects which of the two different strategies is being tested:
+#   limit   - resting limit at the band/level; the MACD cross is a CONFIRMATION that
+#             must have happened within trigger.confirmation_window_bars before the fill
+#   trigger - the MACD cross is the ENTRY TRIGGER (market entry at the next bar's open)
+# They are different strategies and are pre-registered and tested separately.
+spec_version: 1
+strategy: bb_vp_macd
+variant: REQUIRED_UNDECIDED            # limit | trigger
+
+context:                               # 15m and 1h MACD filters
+  direction_definition: REQUIRED_UNDECIDED   # line_vs_signal | hist_sign | line_vs_zero | line_slope
+  agreement_rule: REQUIRED_UNDECIDED         # both | either | 1h_dominates
+  hourly_alignment: REQUIRED_UNDECIDED       # clock (10:00, 11:00 ET) | session (09:30, 10:30 ET)
+  macd_15m:
+    fast: REQUIRED_UNDECIDED                 # e.g. 12
+    slow: REQUIRED_UNDECIDED                 # e.g. 26
+    signal: REQUIRED_UNDECIDED               # e.g. 9
+    source: REQUIRED_UNDECIDED               # close | hlc3
+  macd_1h:
+    fast: REQUIRED_UNDECIDED
+    slow: REQUIRED_UNDECIDED
+    signal: REQUIRED_UNDECIDED
+    source: REQUIRED_UNDECIDED
+
+bollinger:
+  timeframe: REQUIRED_UNDECIDED              # 1m | 5m
+  length: REQUIRED_UNDECIDED
+  mult: REQUIRED_UNDECIDED
+  basis: REQUIRED_UNDECIDED                  # sma | ema
+  stdev: REQUIRED_UNDECIDED                  # population | sample  (they differ!)
+  source: REQUIRED_UNDECIDED                 # close | hlc3
+  reprice_each_bar: REQUIRED_UNDECIDED       # true = order follows the band; false = frozen at signal time
+
+volume_profile:
+  source: REQUIRED_UNDECIDED                 # prior_rth | prior_globex | composite | developing
+  composite_days: REQUIRED_UNDECIDED         # only used when source = composite
+  value_area_pct: REQUIRED_UNDECIDED         # e.g. 0.70
+  bin_size: REQUIRED_UNDECIDED               # 0.25 or an aggregated size (points)
+  poc_tie: REQUIRED_UNDECIDED                # mid | low | high
+  build_from: REQUIRED_UNDECIDED             # trades (correct) | bars (approximate)
+  align_ticks: REQUIRED_UNDECIDED            # X: band within X ticks of a level = "aligned"
+  long_levels: REQUIRED_UNDECIDED            # subset of [VAL, POC, VAH]
+  short_levels: REQUIRED_UNDECIDED           # subset of [VAL, POC, VAH]
+  order_price: REQUIRED_UNDECIDED            # band | level | better
+
+trigger:                                     # 1m / 5m MACD cross
+  timeframes: REQUIRED_UNDECIDED             # [1m] | [5m] | [1m, 5m]
+  both_within_bars: REQUIRED_UNDECIDED       # if both timeframes: crosses within this many 1m bars
+  cross_definition: REQUIRED_UNDECIDED       # line_cross_signal | hist_sign_change | line_cross_zero
+  min_hist_magnitude: REQUIRED_UNDECIDED     # points; 0 = any
+  confirmation_window_bars: REQUIRED_UNDECIDED  # limit variant: cross must precede fill within N bars
+  extreme_lookback_bars: REQUIRED_UNDECIDED     # trigger variant: band touched within N bars of the cross
+  macd:
+    fast: REQUIRED_UNDECIDED
+    slow: REQUIRED_UNDECIDED
+    signal: REQUIRED_UNDECIDED
+    source: REQUIRED_UNDECIDED
+
+orders:
+  window_start_et: REQUIRED_UNDECIDED        # "09:30"
+  window_end_et: REQUIRED_UNDECIDED          # "10:30"
+  expiry_minutes: REQUIRED_UNDECIDED         # resting order lifetime; 0 = until window end
+  cancel_if_band_moves_ticks: REQUIRED_UNDECIDED   # frozen orders: cancel if band moves > M ticks; 0 = never
+  max_concurrent_positions: 1                # engine supports exactly one position at a time
+  max_trades_per_day: REQUIRED_UNDECIDED
+  stop_after_first_win: REQUIRED_UNDECIDED
+  stop_after_first_loss: REQUIRED_UNDECIDED
+  stop:
+    type: REQUIRED_UNDECIDED                 # fixed_ticks | atr_multiple | beyond_level
+    value: REQUIRED_UNDECIDED                # ticks, ATR multiple, or (beyond_level) unused
+    buffer_ticks: REQUIRED_UNDECIDED         # beyond_level: ticks beyond the next level
+  target:
+    type: REQUIRED_UNDECIDED                 # opposite_band | basis | poc | fixed_r
+    value: REQUIRED_UNDECIDED                # R multiple for fixed_r; unused otherwise
+  partials: REQUIRED_UNDECIDED               # none (partials are not yet supported by the engine)
+  breakeven:
+    enabled: REQUIRED_UNDECIDED
+    trigger_r: REQUIRED_UNDECIDED            # move stop to entry once MFE >= this many R
+  time_stop_et: REQUIRED_UNDECIDED           # "10:30" | "11:00"
+  skip_days:
+    fomc: REQUIRED_UNDECIDED
+    release_0830: REQUIRED_UNDECIDED
+    half_days: REQUIRED_UNDECIDED
+    roll_week: REQUIRED_UNDECIDED
+
+sizing:
+  instrument: REQUIRED_UNDECIDED             # NQ | MNQ
+  risk_per_trade_usd: REQUIRED_UNDECIDED
+  risk_pct_of_mll_buffer: REQUIRED_UNDECIDED # used by the Topstep simulation
+  daily_stop_usd: REQUIRED_UNDECIDED
