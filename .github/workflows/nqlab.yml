@@ -35,6 +35,8 @@ jobs:
           pip install -e ".[dev]"
       - name: Fast suite (includes the lookahead property test and golden engine tests)
         run: pytest -q -p no:warnings
+      - name: Kill mid-run and resume from checkpoint (Windows process handling)
+        run: pytest -q -m slow -k kill -p no:warnings
       - name: Slow suite (null calibration harness, kill/resume)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.slow }}
         run: pytest -q -m slow -p no:warnings
