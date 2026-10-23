@@ -329,18 +329,75 @@ def families():
 
 @app.command()
 def rank():
-    """Families ranked by P(first payout) (NOT Sharpe), with every other headline number beside it."""
+    """Families ranked by expected net $ per purchased account (edge haircut), never by Sharpe."""
     from nqlab.selection.ranking import rank_families
 
     f = lambda x, fmt="{:.2f}": "n/a" if x is None else fmt.format(x)  # noqa: E731
-    t = Table("family", "status", "stage", "P(1st payout)", "zero-edge", "P(pass)", "Sharpe ± SE", "DSR",
-              "exp R", "exp $", "PF", "max L", "trades", title="Ranked by P(first payout), never by Sharpe")
+    t = Table("family", "status", "stage", "E\\[net]/acct (haircut)", "E\\[net]/acct", "zero-edge", "path", "P(1st payout)",
+              "Sharpe ± SE", "DSR", "exp R", "PF", "max L", "trades",
+              title="Ranked by expected net $ per purchased account after all fees, never by Sharpe")
     for r in rank_families(_settings()):
         t.add_row(r["family_id"], r["status"], f"{r['furthest_stage']} {r['last_result']}",
-                  f(r["p_first_payout"], "{:.1%}"), f(r["zero_edge_p_first_payout"], "{:.1%}"), f(r["p_pass"], "{:.1%}"),
+                  f(r["ev_net_per_account_haircut"], "${:,.0f}"), f(r["ev_net_per_account"], "${:,.0f}"),
+                  f(r["zero_edge_ev_net"], "${:,.0f}"), r["payout_path"] or "n/a", f(r["p_first_payout"], "{:.1%}"),
                   f"{f(r['sharpe_ann'])} ± {f(r['sharpe_ann_se'])}", f(r["dsr"]), f(r["expectancy_r"]),
-                  f(r["expectancy_usd"]), f(r["profit_factor"]), f(r["max_consec_losses"], "{:.0f}"), f(r["n_trades"], "{:.0f}"))
+                  f(r["profit_factor"]), f(r["max_consec_losses"], "{:.0f}"), f(r["n_trades"], "{:.0f}"))
     con.print(t)
+
+
+@app.command()
+def farm(family_or_strategy: str, params: Optional[str] = None, n_paths: int = 2000, optimize: bool = False):
+    """Account-farming economics: expected net $ per purchased 50K account after every fee,
+    for both payout paths, vs a zero-edge trader and vs the edge cut to its 1-SE lower bound."""
+    from nqlab.errors import Refusal
+    from nqlab.risk.farming import farm_report, optimize_farming
+    from nqlab.risk.topstep import TradeTape
+    from nqlab.selection.family import FamilyStore
+    from nqlab.strategies.registry import get_strategy
+
+    s = _settings()
+    family_id = None
+    try:
+        fam = FamilyStore(s).family(family_or_strategy)
+        strat_name, p = fam["strategy"], json.loads(fam["selected_params_json"] or "{}")
+        family_id = family_or_strategy
+    except Refusal:
+        strat_name = family_or_strategy
+        p = {**get_strategy(strat_name).defaults(), **(json.loads(params) if params else {})}
+    strat = get_strategy(strat_name)
+    r = _logged_backtest(s, strat_name, p, family_id=family_id, note="farm")
+    sz = strat.sizing(p)
+    spec = s.contract(sz.instrument)
+    tape = TradeTape.from_backtest(r.trades, r.daily, spec.point_value, spec.tick_value, s.round_turn_cost(sz.instrument))
+    fr = farm_report(tape, s, strat.topstep_policy(p), sz.instrument, n_paths=n_paths)
+    t = Table("path", "trader", "E\\[net]/account", "P(net>0)", "P(funded)", "P(any payout)", "E\\[fees]", "E\\[paid]",
+              "months", "E\\[net]/month", title=f"{strat_name}: one purchased 50K account, all fees included")
+    for path, v in fr["paths"].items():
+        for label, key in (("strategy", "strategy"), ("zero edge", "zero_edge"), ("edge -1 SE", "haircut")):
+            x = v[key]
+            t.add_row(path, label, f"${x.ev_net:,.0f}", f"{x.p_net_positive:.0%}", f"{x.p_funded:.0%}",
+                      f"{x.p_any_payout:.0%}", f"${x.mean_cost:,.0f}", f"${x.mean_paid:,.0f}", f"{x.mean_months:.1f}",
+                      f"${x.ev_per_month:,.0f}")
+    con.print(t)
+    con.print(f"Fees: {fr['fees']}. Best path judged on the haircut edge: [bold]{fr['best_path']}[/bold].")
+    bz = fr["paths"][fr["best_path"]]["zero_edge"]
+    if bz.ev_net > 0:
+        con.print(f"[yellow]Note:[/yellow] the same trades with ZERO edge still show ${bz.ev_net:,.0f} per account: losses "
+                  "are capped at the fees while payouts are not, so variance alone has value under these rules. Only the "
+                  "part above the zero-edge line is your edge; the rest is the payout structure (and depends on rules "
+                  "nqlab could not verify).")
+    if optimize:
+        ts = s.section("topstep")
+        opt = optimize_farming(tape, s.topstep_rules, s, n_paths=max(200, n_paths // 4),
+                               combine_budget=ts["combine_horizon_sessions"], xfa_horizon=ts["xfa_horizon_sessions"])
+        b, bu = opt["best"], opt["best_unhaircut"]
+        if b["combine_risk"] == max(opt["grid"]["combine_risk"]) or b["xfa_risk"] == max(opt["grid"]["xfa_risk"]):
+            con.print("[yellow]The best cell is at the edge of the grid (largest size tested).[/yellow] Bigger may score "
+                      "higher in simulation, but every extra contract leans harder on the edge being real.")
+        con.print(f"Best sizing (MNQ, judged on the haircut edge): {b['path']} path, {b['combine_risk']:.0%} of the MLL "
+                  f"buffer per trade in the Combine, {b['xfa_risk']:.0%} funded -> E[net] ${b['ev_net_haircut']:,.0f} haircut / "
+                  f"${b['ev_net']:,.0f} measured. On the measured edge alone it would pick {bu['combine_risk']:.0%} / "
+                  f"{bu['xfa_risk']:.0%}.")
 
 
 @app.command()

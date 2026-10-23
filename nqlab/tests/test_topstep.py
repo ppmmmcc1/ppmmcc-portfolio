@@ -31,12 +31,19 @@ def ref_combine(days, r: AccountRules, n_contracts=1, pv=20.0, fee=3.78, liq=2.0
     for i, d in enumerate(days):
         b0 = bal
         failed = False
+        day = 0.0
         for pnl, mae, _ in d:
             if bal - mae * pv * n_contracts - fee * n_contracts <= mll:
                 bal = mll - liq * tv * n_contracts - fee * n_contracts
                 failed = True
                 break
-            bal += pnl * pv * n_contracts - fee * n_contracts
+            if r.dll_enabled and day - mae * pv * n_contracts - fee * n_contracts <= -r.dll_amount:
+                loss = r.dll_amount + day + liq * tv * n_contracts + fee * n_contracts
+                bal -= loss
+                break                                   # day stopped, account still alive
+            res = pnl * pv * n_contracts - fee * n_contracts
+            bal += res
+            day += res
         if failed:
             return OUT_FAIL_MLL, i + 1
         best = max(best, bal - b0)

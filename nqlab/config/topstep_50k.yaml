@@ -1,11 +1,13 @@
 # Topstep Trading Combine 50K + Express Funded Account (XFA) rules.
 # These are DATA, never constants in code. Topstep changes them.
-# VERIFY against the Topstep Help Center before trusting any output.
-rules_version: "2026-10 (unverified)"
+rules_version: "2026-10-23 (Topstep dashboard, 50K, Responsible Trading Advantage)"
 verify_note: >
-  Values below were transcribed for late 2026 and have NOT been verified against
-  Topstep's Help Center. The consistency threshold in particular is reported as 0.50 by
-  some sources and 0.55 by others.
+  Confirmed from the Topstep dashboard on 2026-10-23: profit target, 55% consistency
+  target, $2,000 max loss limit, 5 mini / 50 micro, $1,000 daily loss limit with doubled
+  payout caps ($4,000 standard / $6,000 consistency), payout path conditions, $49/month,
+  $49 reset with a monthly reset credit, $149 Express Funded activation. NOT shown on that
+  page and still unverified: the 90/10 split, the 50%-of-balance payout limit, the MLL
+  lock at $52,000, XFA MLL mechanics, any XFA contract scaling plan.
 
 combine:
   account_size: 50000
@@ -13,36 +15,51 @@ combine:
   max_loss_limit:
     amount: 2000
     trails: end_of_day_balance_highs   # never moves down
-    locks_at: 50000                    # MLL stops trailing here ...
-    lock_trigger_balance: 52000        # ... once EOD balance >= this
+    locks_at: 50000                    # MLL stops trailing here ...  (unverified)
+    lock_trigger_balance: 52000        # ... once EOD balance >= this (unverified)
     enforced: real_time                # INCLUDING unrealized P&L
   daily_loss_limit:
-    enabled: false                     # optional, chosen at purchase, carries to funded
+    enabled: true                      # "Responsible Trading Advantage": $1,000 DLL, double payout caps
     amount: 1000
   consistency:
-    best_day_max_pct: 0.55             # some sources say 0.50; flagged in every report
+    best_day_max_pct: 0.55             # confirmed on the dashboard
   max_contracts: {minis: 5, micros: 50}
   flatten_deadline_ct: "15:10"
 
 xfa:
   starting_balance: 0
   max_loss_limit:
-    amount: 2000                       # MLL starts at -2000
+    amount: 2000                       # MLL starts at -2000 (unverified mechanics)
     trails: end_of_day_balance_highs
     locks_at: 0
     reset_to_after_first_payout: 0
-  payout_split: 0.90
+  payout_split: 0.90                   # unverified
   min_payout: 125
-  path: standard                       # standard | consistency
+  path: standard                       # standard | consistency (both are always simulated)
   standard:
-    winning_days_required: 5
+    winning_days_required: 5           # five $150 winning days
     winning_day_min: 150
-    max_pct_of_balance: 0.50
-    max_payout: 2000
+    max_pct_of_balance: 0.50           # unverified; the page says "maintain your balance between payouts"
+    max_payout: 4000                   # doubled cap (was $2,000)
   consistency_path:
-    min_trading_days: 3
+    min_trading_days: 3                # at least 3 days with at least one trade
     best_day_max_pct: 0.40
-    max_payout: 3000
+    max_pct_of_balance: 0.50           # unverified
+    max_payout: 6000                   # doubled cap (was $3,000)
   daily_loss_limit:
-    enabled: false
+    enabled: true
     amount: 1000
+  # Funded-account contract scaling plan, if Topstep applies one to your account. NOT on the
+  # dashboard page you checked, so it is empty (no limit beyond max_contracts). Fill it from
+  # the Help Center if it applies; rows ascend by balance and cap contracts (in minis) from
+  # that end-of-day balance upward, e.g.
+  #   - {balance: -2000, minis: 2}
+  #   - {balance: 1500,  minis: 3}
+  scaling_plan: []
+
+fees:                                  # what farming an account costs
+  subscription_per_month: 49
+  reset_fee: 49
+  reset_credits_per_month: 1           # "Monthly Reset Credit on Rebill"
+  xfa_activation_fee: 149
+  sessions_per_month: 21               # trading sessions per billing month

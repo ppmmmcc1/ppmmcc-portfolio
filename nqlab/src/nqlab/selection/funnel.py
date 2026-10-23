@@ -238,12 +238,32 @@ def stage_propsim(ctx: FamilyContext) -> StageResult:
          "p_first_payout": pfp, "zero_edge_p_first_payout": zfp, "risk_search": risk.to_dicts(),
          "max_consec_losses_q": np.quantile(boot.max_consec_losses, [0.5, 0.9, 0.99]).tolist() if len(boot.max_consec_losses) else [],
          "sessions_to_pass": boot.sessions_to_pass.tolist()[:5000]}
+    # ---- account farming economics (the objective): net $ per purchased account ----------
+    from nqlab.risk.farming import farm_report, optimize_farming
+
+    fr = farm_report(tape, ctx.settings, policy, sz.instrument, n_paths=min(n_paths, 2000))
+    best = fr["best_path"]
+    fs = fr["paths"][best]
+    d["farming"] = {k: {kk: vv.as_dict() for kk, vv in v.items()} for k, v in fr["paths"].items()}
+    d["farming_best_path"] = best
+    d["ev_net_per_account"] = fs["strategy"].ev_net
+    d["ev_net_per_account_haircut"] = fs["haircut"].ev_net
+    d["zero_edge_ev_net_per_account"] = fs["zero_edge"].ev_net
+    opt = optimize_farming(tape, ctx.settings.topstep_rules, ctx.settings, fracs=[0.05, 0.10, 0.20, 0.30, 0.40],
+                           n_paths=300, combine_budget=ts["combine_horizon_sessions"], xfa_horizon=ts["xfa_horizon_sessions"])
+    d["farming_grid"] = opt["grid"].to_dicts()
+    d["farming_best_sizing"] = opt["best"]
+    d["farming_best_sizing_unhaircut"] = opt["best_unhaircut"]
     if hist.n_paths < 60:
         return StageResult(6, INSUFFICIENT, "Too few sessions for a meaningful Combine simulation.", d)
-    if not pfp > zfp + 0.05:
-        return StageResult(6, FAIL, f"P(first payout) {pfp:.1%} is not clearly better than the same trades with the edge "
-                           f"removed ({zfp:.1%}).", d)
-    return StageResult(6, PASS, f"P(first payout) {pfp:.1%} vs {zfp:.1%} for a zero-edge trader with the same sizing.", d)
+    ev, evh, ez = fs["strategy"].ev_net, fs["haircut"].ev_net, fs["zero_edge"].ev_net
+    if not evh > 0:
+        return StageResult(6, FAIL, f"Expected net per purchased account is ${ev:,.0f} after all fees, but ${evh:,.0f} with "
+                           "the edge cut to its one-standard-error lower bound: farming this is not reliably profitable.", d)
+    if not ev > ez:
+        return StageResult(6, FAIL, f"Expected net per account ${ev:,.0f} is no better than a zero-edge trader (${ez:,.0f}).", d)
+    return StageResult(6, PASS, f"Expected net ${ev:,.0f} per purchased account after all fees (${evh:,.0f} with the edge "
+                       f"haircut; zero-edge trader ${ez:,.0f}) on the {best} payout path; P(first payout) {pfp:.1%}.", d)
 
 
 STAGES: dict[int, Callable[[FamilyContext], StageResult]] = {

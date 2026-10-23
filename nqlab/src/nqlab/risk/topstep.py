@@ -50,9 +50,12 @@ class AccountRules:
     x_cons_min_days: int
     x_cons_pct: float
     x_cons_max_payout: float
+    x_cons_max_pct: float
     x_dll_enabled: bool
     x_dll_amount: float
     verify_note: str = ""
+    x_scale_balance: tuple = ()        # funded-account scaling plan: balance thresholds ...
+    x_scale_contracts: tuple = ()      # ... and the contract limit from that balance up
 
     @classmethod
     def from_config(cls, cfg: dict[str, Any], instrument: str = "NQ") -> "AccountRules":
@@ -73,9 +76,12 @@ class AccountRules:
             x_max_pct=float(x["standard"]["max_pct_of_balance"]), x_max_payout=float(x["standard"]["max_payout"]),
             x_cons_min_days=int(x["consistency_path"]["min_trading_days"]), x_cons_pct=float(x["consistency_path"]["best_day_max_pct"]),
             x_cons_max_payout=float(x["consistency_path"]["max_payout"]),
+            x_cons_max_pct=float(x["consistency_path"].get("max_pct_of_balance", x["standard"]["max_pct_of_balance"])),
             x_dll_enabled=bool(x.get("daily_loss_limit", {}).get("enabled", False)),
             x_dll_amount=float(x.get("daily_loss_limit", {}).get("amount", 1e18)),
             verify_note=str(cfg.get("verify_note", "")),
+            x_scale_balance=tuple(float(r["balance"]) for r in (x.get("scaling_plan") or [])),
+            x_scale_contracts=tuple(int(r["minis"]) * (1 if instrument == "NQ" else 10) for r in (x.get("scaling_plan") or [])),
         )
 
     def combine_tuple(self):
@@ -85,7 +91,14 @@ class AccountRules:
     def xfa_tuple(self):
         return (self.x_mll_amount, self.x_lock_at, self.x_reset_after_payout, self.x_split, self.x_min_payout,
                 self.x_path_standard, self.x_win_days, self.x_win_min, self.x_max_pct, self.x_max_payout,
-                self.x_cons_min_days, self.x_cons_pct, self.x_cons_max_payout, self.x_dll_enabled, self.x_dll_amount)
+                self.x_cons_min_days, self.x_cons_pct, self.x_cons_max_payout, self.x_cons_max_pct,
+                self.x_dll_enabled, self.x_dll_amount,
+                np.asarray(self.x_scale_balance, np.float64), np.asarray(self.x_scale_contracts, np.int64))
+
+    def with_path(self, standard: bool) -> "AccountRules":
+        import dataclasses
+
+        return dataclasses.replace(self, x_path_standard=bool(standard))
 
 
 @dataclass
@@ -222,7 +235,7 @@ def run_combine(day_ptr, pnl, mae, stop, fee_pc, pv, tv, liq_ticks, d0, max_days
 @nb.njit(cache=True)
 def run_xfa(day_ptr, pnl, mae, stop, fee_pc, pv, tv, liq_ticks, d0, max_days,
             mll_amt, lock_at, reset_after, split, min_pay, standard, win_days, win_min, max_pct, max_pay,
-            cons_days, cons_pct, cons_max, dll_on, dll_amt, max_c, sz_mode, sz_param):
+            cons_days, cons_pct, cons_max, cons_max_pct, dll_on, dll_amt, scale_bal, scale_max, max_c, sz_mode, sz_param):
     """Express Funded Account from a $0 balance. Returns (n_payouts, paid_to_trader,
     breached, sessions_used, first_payout_session)."""
     n_days = day_ptr.shape[0] - 1
@@ -241,8 +254,12 @@ def run_xfa(day_ptr, pnl, mae, stop, fee_pc, pv, tv, liq_ticks, d0, max_days,
     d = d0
     while d < n_days and used < max_days:
         bal0 = balance
+        day_max = max_c
+        for j in range(scale_bal.shape[0]):        # scaling plan (ascending): limit by start-of-day balance
+            if balance >= scale_bal[j]:
+                day_max = scale_max[j] if scale_max[j] < max_c else max_c
         balance, day_real, ev, traded = _trade_day(balance, mll, 0.0, dll_on, dll_amt, day_ptr[d], day_ptr[d + 1],
-                                                   pnl, mae, stop, fee_pc, pv, tv, liq_ticks, sz_mode, sz_param, max_c)
+                                                   pnl, mae, stop, fee_pc, pv, tv, liq_ticks, sz_mode, sz_param, day_max)
         used += 1
         day_pnl = balance - bal0
         if ev == EV_MLL:
@@ -263,6 +280,7 @@ def run_xfa(day_ptr, pnl, mae, stop, fee_pc, pv, tv, liq_ticks, d0, max_days,
                 mll = lock_at
         eligible = False
         cap = 0.0
+        pct = max_pct
         if standard:
             if wins >= win_days:
                 eligible = True
@@ -271,8 +289,9 @@ def run_xfa(day_ptr, pnl, mae, stop, fee_pc, pv, tv, liq_ticks, d0, max_days,
             if days_since >= cons_days and profit_since > 0 and best_since <= cons_pct * profit_since:
                 eligible = True
                 cap = cons_max
+                pct = cons_max_pct
         if eligible and balance > 0:
-            amt = max_pct * balance
+            amt = pct * balance
             if amt > cap:
                 amt = cap
             if amt >= min_pay:

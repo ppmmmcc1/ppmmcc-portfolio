@@ -88,6 +88,15 @@ th { color:var(--muted); font-weight:600; }
 <p class="small muted">Sizing: {{ sizing_label }}. Rules version: {{ rules_version }}. {{ rules_note }}</p>
 {% endif %}
 
+{% if farm_rows %}
+<h2>Account farming: what one purchased 50K account is worth</h2>
+<p class="small">One lifecycle: buy the Combine, reset after every failure (the monthly reset credit covers one reset per billed month), pay the activation fee when it passes, then take every payout you are eligible for until the funded account's MLL is breached. Net = your share of payouts minus subscription months, paid resets and activation. The most an account can cost you is its fees; that is why the number to maximize is expected net per account, judged on the haircut edge so a lucky backtest does not set your size.</p>
+<table><tr><th>Payout path</th><th>Trader</th><th>E[net $] / account</th><th>P(net &gt; 0)</th><th>P(funded)</th><th>P(any payout)</th><th>E[fees]</th><th>E[paid to you]</th><th>Months</th><th>E[net] / month</th></tr>
+{% for r in farm_rows %}<tr><td>{{ r.path }}</td><td>{{ r.who }}</td><td><b>{{ r.ev }}</b></td><td>{{ r.p_pos }}</td><td>{{ r.p_funded }}</td><td>{{ r.p_pay }}</td><td>{{ r.cost }}</td><td>{{ r.paid }}</td><td>{{ r.months }}</td><td>{{ r.per_month }}</td></tr>{% endfor %}
+</table>
+<p class="small">{{ farm_best }} Running several accounts on the same signals multiplies the expected value AND the risk: they win and lose together, so it is not diversification.</p>
+{% endif %}
+
 <h2>Data and assumptions</h2>
 <ul class="small">{% for a in assumptions %}<li>{{ a }}</li>{% endfor %}</ul>
 <p class="muted small">Generated {{ generated }} by nqlab {{ version }} &middot; run {{ run_id }} &middot; data {{ data_version }}</p>

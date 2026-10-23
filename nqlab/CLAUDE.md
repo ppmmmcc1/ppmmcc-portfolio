@@ -33,7 +33,12 @@ INSUFFICIENT DATA rather than PASS. Convenience never beats statistical honesty.
 - Windows-native: `pathlib` everywhere, no symlinks, no fork. Every parallel entry
   point has an `if __name__ == "__main__":` guard; strategies are resolved **by name**
   from `strategies/registry.py` inside workers, never passed as closures.
-- Prop-firm rules live in `config/topstep_50k.yaml`, never as constants in code.
+- Prop-firm rules and fees live in `config/topstep_50k.yaml`, never as constants in code.
+- The operator's objective (2026-10-23) is farming: pass Combines, extract as much as
+  possible from the funded accounts. The primary metric is therefore expected net dollars
+  per purchased account after ALL fees (`risk/farming.py`), judged with the edge cut to
+  its one-standard-error lower bound, and always shown next to the zero-edge trader.
+  P(first payout) and every other metric stay beside it. Never rank by Sharpe.
 - Every feature declares which price series it uses (unadjusted / back_adjusted /
   ratio_adjusted). Volume profile may only use unadjusted prices.
 - A family that fails a gate is archived, not tweaked. A tweak is a new family with a

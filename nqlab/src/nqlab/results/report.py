@@ -196,6 +196,54 @@ def build_report(settings, md, strategy: str, params: dict[str, Any], out_path: 
                             "$2,000 distance to the MLL, not $50,000. Simulated in MNQ for sizing granularity; trades without a stop "
                             "cannot be risk-sized and are skipped."))
 
+    # ---- account farming economics ---------------------------------------------------------
+    farm_rows, farm_best, kpi_ev = [], "", None
+    if propsim and tape.n_days > 20:
+        from nqlab.risk.farming import farm_report, optimize_farming
+
+        fr = farm_report(tape, settings, policy, sz.instrument, n_paths=int(min(npth, 2000)))
+        for path, v in fr["paths"].items():
+            for label, key in (("this strategy", "strategy"), ("same trades, zero edge", "zero_edge"),
+                               ("edge cut to its 1-SE lower bound", "haircut")):
+                st = v[key]
+                farm_rows.append({"path": path, "who": label, "ev": _fmt(st.ev_net, "usd"), "p_pos": _fmt(st.p_net_positive, "pct"),
+                                  "p_funded": _fmt(st.p_funded, "pct"), "p_pay": _fmt(st.p_any_payout, "pct"),
+                                  "cost": _fmt(st.mean_cost, "usd"), "paid": _fmt(st.mean_paid, "usd"),
+                                  "months": _fmt(st.mean_months, "num", 1), "per_month": _fmt(st.ev_per_month, "usd")})
+        bp = fr["best_path"]
+        kpi_ev = fr["paths"][bp]["strategy"].ev_net
+        zev = fr["paths"][bp]["zero_edge"].ev_net
+        if zev > 0:
+            warnings.append(f"The same trades with ZERO edge still show {_fmt(zev, 'usd')} per account: losses are capped at "
+                            "the fees while payouts are not, so variance alone has value under these rules. Only the part "
+                            "above the zero-edge line is your edge; the rest is the payout structure, and it depends on rules "
+                            "nqlab could not verify (payout %, split, scaling).")
+        h = go.Figure()
+        for path, v in fr["paths"].items():
+            h.add_histogram(x=v["strategy"].nets, name=f"{path} path", opacity=.6, nbinsx=50)
+        h.add_vline(x=0, line_dash="dash")
+        figures.append(_fig(h, "Net $ per purchased account (distribution over simulated lifecycles)",
+                            "Left of zero: the account cost more in fees than it paid out."))
+        opt = optimize_farming(tape, rules_cfg, settings, fracs=[0.05, 0.10, 0.20, 0.30, 0.40], n_paths=300,
+                               combine_budget=ts["combine_horizon_sessions"], xfa_horizon=ts["xfa_horizon_sessions"])
+        b, bu = opt["best"], opt["best_unhaircut"]
+        g = opt["grid"].filter(pl.col("path") == b["path"]).sort("combine_risk", "xfa_risk")
+        xs = sorted(set(g["xfa_risk"].to_list()))
+        ys = sorted(set(g["combine_risk"].to_list()))
+        z = [[g.filter((pl.col("combine_risk") == y) & (pl.col("xfa_risk") == x))["ev_net_haircut"][0] for x in xs] for y in ys]
+        f = go.Figure(go.Heatmap(z=z, x=[f"{x:.0%}" for x in xs], y=[f"{y:.0%}" for y in ys], colorscale="RdBu", zmid=0,
+                                 colorbar=dict(title="$")))
+        f.update_xaxes(title="funded-account risk per trade (share of MLL buffer)")
+        f.update_yaxes(title="Combine risk per trade (share of MLL buffer)")
+        farm_best = (f"Best sizing on the {b['path']} path, judged with the edge haircut: {b['combine_risk']:.0%} of the MLL "
+                     f"buffer per trade in the Combine and {b['xfa_risk']:.0%} in the funded account (MNQ), expected net "
+                     f"{_fmt(b['ev_net_haircut'], 'usd')} per account haircut / {_fmt(b['ev_net'], 'usd')} as measured. "
+                     f"Sizing on the measured edge alone would pick {bu['combine_risk']:.0%} / {bu['xfa_risk']:.0%}.")
+        if b["combine_risk"] == max(opt["grid"]["combine_risk"]) or b["xfa_risk"] == max(opt["grid"]["xfa_risk"]):
+            farm_best += (" The best cell is at the edge of the grid (largest size tested): bigger may score higher in "
+                          "simulation, but every extra contract leans harder on the edge being real.")
+        figures.append(_fig(f, f"Farming sizing grid ({b['path']} path): expected net $ per account, edge haircut", farm_best))
+
     # ---- family-stage figures --------------------------------------------------------------
     wf_rows = []
     for row in stage_rows or []:
@@ -305,7 +353,8 @@ def build_report(settings, md, strategy: str, params: dict[str, Any], out_path: 
         "Ambiguous bars (stop and target both touched) resolve to the stop.",
         f"10 MNQ cost ${10 * settings.round_turn_cost('MNQ'):.2f} per round turn versus ${settings.round_turn_cost('NQ'):.2f} "
         "for 1 NQ, for identical exposure.",
-        f"Topstep rules {rv} are UNVERIFIED; consistency threshold {cons:.0%} (some sources say 50%).",
+        f"Topstep rules {rv}; consistency target {cons:.0%}. Not shown on the Topstep page and still unverified: "
+        "payout split, 50%-of-balance payout limit, MLL lock level, XFA scaling.",
         "Release calendar is transcribed, not verified; NFP/ISM dates are rule-based approximations.",
     ]
     assumptions += [f"Data warning: {w}" for w in md.warnings]
@@ -313,6 +362,7 @@ def build_report(settings, md, strategy: str, params: dict[str, Any], out_path: 
         assumptions.append("Volume profile built from 1-minute bars is APPROXIMATE (volume spread over each bar's range).")
 
     kpis = [
+        {"k": "Expected net $ per purchased account, after all fees (primary)", "v": _fmt(kpi_ev, "usd")},
         {"k": "Sharpe (annualized) ± SE", "v": f"{_fmt(m2['sharpe_ann'])} ± {_fmt(m2['sharpe_ann_se'])}"},
         {"k": "Expectancy per trade", "v": f"{_fmt(m2['expectancy_r'])} R / {_fmt(m2['expectancy_usd'], 'usd')}"},
         {"k": "Profit factor", "v": _fmt(m2["profit_factor"])},
@@ -335,6 +385,7 @@ def build_report(settings, md, strategy: str, params: dict[str, Any], out_path: 
         title=f"{family_id or strategy}: verdict", subtitle=f"{strategy} · {json.dumps(params)[:300]}",
         verdict=verdict, n_trials=n_trials, warnings=warnings, notes=notes, kpis=kpis, stages=stages, tiers=tiers,
         fill_line=fill_line, diag=diag, figures=figures, wf_rows=wf_rows, ss=ss, topstep=topstep_rows, mc_rows=mc_rows,
+        farm_rows=farm_rows, farm_best=farm_best,
         zero_edge_line=ZERO_EDGE_LINE + " (With the trailing MLL simulated here the zero-edge rate is lower still; see the "
         "middle column, which uses this strategy's own trade sizes with the edge removed.)",
         sizing_label=policy.label(), rules_version=rv, rules_note=rules_cfg.get("verify_note", ""),

@@ -55,7 +55,8 @@ nqlab run orb_v1 --auto --workers auto  # stages 1-6, stops at the first gate th
 nqlab promote orb_v1                    # only after a PASS; refused otherwise
 nqlab holdout orb_v1 --confirm          # stage 7: ONE look, recorded permanently
 nqlab ledger stats                      # N, the number every DSR is deflated by
-nqlab rank                              # families ranked by P(first payout), never by Sharpe
+nqlab rank                              # families ranked by expected net $ per account, never by Sharpe
+nqlab farm orb --optimize               # what one purchased 50K account is worth, and how to size it
 ```
 
 Every run, including errored and abandoned ones and every LLM-generated variant, goes
@@ -117,7 +118,38 @@ Things in every report that should change your mind on their own:
   $50,000. P(first payout) usually peaks well below the size that maximizes expected
   profit; size for the former.
 
-## 5. Overnight batches on Windows
+## 5. Farming accounts: what one 50K account is worth
+
+The goal is to pass Combines and pull as much as possible out of the funded accounts.
+Since the most an account can cost you is its fees, the number nqlab optimizes is
+**expected net dollars per purchased account after every fee**:
+
+- Combine: $49 per billed month (21 sessions), a reset after each failure ($49; the
+  monthly reset credit covers one per billed month), until it passes or 250 sessions pass.
+- Funded: $149 activation, then every payout you qualify for, on either path, until the
+  funded account's max loss limit is hit (or 250 sessions):
+  - **Standard**: five $150 winning days; payout capped at $4,000.
+  - **Consistency**: 3+ trading days, best day within 40% of profit; capped at $6,000.
+- $1,000 daily loss limit and the $2,000 trailing max loss limit in both phases; 5 NQ / 50 MNQ.
+
+`nqlab farm <family or strategy> --optimize` prints, for both payout paths:
+
+| Row | Meaning |
+|---|---|
+| this strategy | Expected net per account, chance it is net positive, chance it gets funded, months it takes, net per month. |
+| same trades, zero edge | Your trade sizes with the edge removed. Under these rules this can be **positive**: losses are capped at the fees and payouts are not, so variance alone has value. Only the part above this row is your edge. |
+| edge -1 SE | Your edge reduced to its one-standard-error lower bound. Size and path are chosen on THIS row, so a lucky backtest does not set your size. |
+
+`--optimize` searches risk per trade (as a share of the live MLL buffer, in MNQ) separately
+for the Combine and the funded account. Running several accounts on the same signals
+multiplies the expected value and the risk together: they pass and blow up together.
+
+Rules come from your Topstep dashboard (2026-10-23) in `config\topstep_50k.yaml`. Not on
+that page and still unverified: the payout split, the 50%-of-balance payout limit, the MLL
+lock level and any funded-account scaling plan (`xfa.scaling_plan`, empty until you fill it).
+These matter a lot for farming numbers: check them in the Help Center.
+
+## 6. Overnight batches on Windows
 
 Queue the night's work, then let Task Scheduler run it:
 
@@ -157,7 +189,7 @@ lid. In the morning read `reports\morning_YYYYMMDD.md` and the HTML reports in
 If the machine sleeps anyway, nothing is lost: the next run resumes interrupted jobs from
 their checkpoints.
 
-## 6. Upgrading data: the Databento path
+## 7. Upgrading data: the Databento path
 
 Free 1-minute bars cannot show queue position, so they support fill tiers 1 and 2 only,
 and the volume profile is approximate. Databento (`GLBX.MDP3`) adds real per-contract
@@ -178,7 +210,7 @@ bars (volume-based rolls), trades (tier 3 queue model, exact volume profile) and
 The holdout boundary set by your first ingest does not move when the data source
 changes.
 
-## 7. What nqlab will not do
+## 8. What nqlab will not do
 
 - Report tier-1 (touch) fills as a headline number.
 - Let the LLM pick a strategy, choose a parameter, or produce a number (numbers in LLM
@@ -189,11 +221,11 @@ changes.
 - Re-run a stage that already passed or failed, skip a stage, or promote a failed family.
 - Read the holdout outside `nqlab holdout`.
 
-## 8. Known limitations (read before trusting anything)
+## 9. Known limitations (read before trusting anything)
 
-- Topstep rules in `config\topstep_50k.yaml` and the release calendar in
-  `config\events.yaml` were transcribed, not verified. Check them against Topstep's Help
-  Center and an official release calendar (`nqlab data events-import`).
+- The Topstep rules were matched to your dashboard; the payout split, 50%-of-balance limit,
+  MLL lock level and funded scaling plan were not on it and remain unverified. The release
+  calendar in `config\events.yaml` was transcribed, not verified (`nqlab data events-import`).
 - A pre-spliced continuous CSV hides roll dates and gaps; indicators with lookbacks
   across a roll may be contaminated on roll days. Per-contract data fixes this.
 - One position at a time; no partial exits yet.
