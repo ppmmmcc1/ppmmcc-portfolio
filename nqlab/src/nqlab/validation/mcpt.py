@@ -82,6 +82,9 @@ def run_mcpt(md, strategy: str, space: dict, fixed: dict, categorical: tuple, se
              n_jobs: int = 1, bucket_minutes: int = 30, on_permutation: Callable[[int], None] | None = None) -> MCPTResult:
     wf = settings.section("validation")["walk_forward"]
     grid = Grid.build(space, fixed, categorical)
+    # the real statistic is computed exactly like the permuted ones: on a bars-only copy
+    # (no real trades), so real and null use the same feature construction
+    md = md.with_bars(md.bars, md.data_version)
     cp = dict(checkpoint or {})
     real = cp.get("real") or family_statistics(md, strategy, grid, settings, fill_tier, wf)
     done: dict[int, dict[str, float]] = {int(k): v for k, v in (cp.get("done") or {}).items()}
@@ -106,8 +109,8 @@ def run_mcpt(md, strategy: str, space: dict, fixed: dict, categorical: tuple, se
     else:
         from joblib import Parallel, delayed
 
-        # never ship cached features / engine bars to workers, and cap workers by memory
-        md = md.with_bars(md.bars, md.data_version)
+        # never ship cached features / engine bars to workers (md is already a cache-free
+        # copy), and cap workers by memory
         cap_mb = float(settings.section("runner").get("max_worker_memory_mb", 2000))
         per_worker = max(md.bars.estimated_size("mb") * 4.0, 1.0)     # bars + features + permuted copy
         n_jobs = max(1, min(n_jobs, int(cap_mb // per_worker) or 1))

@@ -50,7 +50,15 @@ def consume_holdout(settings, fid: str, confirm: bool = False) -> StageResult:
         warm = research.bars.filter(pl.col("session_date").is_in(warm_dates))
         cols = [c for c in hold.bars.columns if c in warm.columns]
         bars = pl.concat([warm.select(cols), hold.bars.select(cols)], how="vertical_relaxed")
-        md = MarketData(bars, hold.sessions, hold.data_version, hold.provenance, hold.warnings)
+        meta = {}
+        from nqlab.data.store import DataStore
+
+        hs = DataStore(settings)
+        if hs.has_holdout_ticks("trades") and research.meta.get("trades") is not None:
+            # exact profiles on the holdout use holdout trades (+ the research tail for warm-up)
+            meta["trades"] = pl.concat([research.meta["trades"].collect(), hs.scan_ticks("trades", holdout=True).collect()],
+                                       how="vertical_relaxed").lazy()
+        md = MarketData(bars, hold.sessions, hold.data_version, hold.provenance, hold.warnings, meta=meta)
         r = run_backtest(md, f["strategy"], cfg, settings, fill_tier=2)
         r1 = run_backtest(md, f["strategy"], cfg, settings, fill_tier=1)
     is_r = run_backtest(research, f["strategy"], cfg, settings, fill_tier=2)

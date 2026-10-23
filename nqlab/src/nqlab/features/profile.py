@@ -251,21 +251,24 @@ _DEF = {"bin_size": 0.25, "va_pct": 0.70, "poc_tie": "mid", "build_from": "bars"
 _NOTE = "built from 1m bars (volume spread uniformly over each bar's range) unless build_from='trades'"
 
 
-def _check(build_from):
+def _check(build_from, md=None):
     if build_from not in ("bars", "trades"):
         raise ValueError("build_from must be 'bars' (approximate) or 'trades' (exact)")
+    if md is not None and build_from == "trades" and md.meta.get("bars_only"):
+        return "bars"      # synthetic/permuted data: no real trades exist for these bars
+    return build_from
 
 
 @feature("vp_prior_rth", series="unadjusted", unadjusted_only=True, defaults=_DEF, approximate_note=_NOTE)
 def vp_prior_rth(md, bin_size, va_pct, poc_tie, build_from):
-    _check(build_from)
+    build_from = _check(build_from, md)
     return _frame(*_session_profiles(md, _rth_mask(md), bin_size, va_pct, _TIE[poc_tie], 1, build_from),
                   approximate=build_from == "bars")
 
 
 @feature("vp_prior_globex", series="unadjusted", unadjusted_only=True, defaults=_DEF, approximate_note=_NOTE)
 def vp_prior_globex(md, bin_size, va_pct, poc_tie, build_from):
-    _check(build_from)
+    build_from = _check(build_from, md)
     return _frame(*_session_profiles(md, np.ones(md.bars.height, bool), bin_size, va_pct, _TIE[poc_tie], 1, build_from),
                   approximate=build_from == "bars")
 
@@ -273,7 +276,7 @@ def vp_prior_globex(md, bin_size, va_pct, poc_tie, build_from):
 @feature("vp_composite", series="unadjusted", unadjusted_only=True, defaults={**_DEF, "n_days": 5},
          approximate_note=_NOTE)
 def vp_composite(md, bin_size, va_pct, poc_tie, n_days, build_from):
-    _check(build_from)
+    build_from = _check(build_from, md)
     return _frame(*_session_profiles(md, _rth_mask(md), bin_size, va_pct, _TIE[poc_tie], int(n_days), build_from),
                   approximate=build_from == "bars")
 
@@ -281,7 +284,7 @@ def vp_composite(md, bin_size, va_pct, poc_tie, n_days, build_from):
 @feature("vp_developing", series="unadjusted", unadjusted_only=True, defaults={**_DEF, "rth_only": True},
          approximate_note=_NOTE)
 def vp_developing(md, bin_size, va_pct, poc_tie, rth_only, build_from):
-    _check(build_from)
+    build_from = _check(build_from, md)
     include = _rth_mask(md) if rth_only else np.ones(md.bars.height, bool)
     n = md.bars.height
     poc = np.full(n, -(1 << 62), np.int64)

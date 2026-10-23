@@ -96,8 +96,13 @@ class DataStore:
     def has_ticks(self, schema: str) -> bool:
         return any((self.parquet / schema).glob("*/part.parquet")) if (self.parquet / schema).exists() else False
 
-    def scan_ticks(self, schema: str) -> pl.LazyFrame:
-        return self._scan(self.parquet / schema)
+    def scan_ticks(self, schema: str, holdout: bool = False) -> pl.LazyFrame:
+        return self._scan((self.holdout if holdout else self.parquet) / schema)
+
+    def has_holdout_ticks(self, schema: str) -> bool:
+        assert_readable(self.holdout / schema)
+        d = self.holdout / schema
+        return d.exists() and any(d.glob("*/part.parquet"))
 
     # ---- lockbox boundary ------------------------------------------------------------
     def lockbox(self) -> dict[str, Any] | None:

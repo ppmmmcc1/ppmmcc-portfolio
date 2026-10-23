@@ -112,3 +112,18 @@ def test_mcpt_small(small_md, session_settings):
                     n_perm=9, checkpoint=cps[1], checkpoint_every=4, on_permutation=seen.append)
     assert len(seen) == 9 - len(cps[1]["done"])
     assert res2.p_values == res.p_values
+
+
+def test_permuted_data_never_carries_real_trades(small_md):
+    import datetime as dt
+
+    from nqlab.data.market import MarketData
+    from nqlab.features import compute
+
+    trades = pl.DataFrame({"ts_utc": [small_md.bars["ts_utc"][600] + dt.timedelta(seconds=5)], "price": [15000.0],
+                           "size": [10]})
+    md = MarketData(small_md.bars, small_md.sessions, "x", meta={"trades": trades})
+    pm = permute_bars(md, 3)
+    assert "trades" not in pm.meta and pm.meta["bars_only"]
+    f = compute(pm, "vp_prior_rth", build_from="trades")    # falls back to bars, consistently
+    assert f["vp_approximate"].all()

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+:root { --bg:#fbfbfa; --fg:#1d1d1f; --muted:#6b6b70; --line:#e2e2e0; --pass:#1f7a3a; --fail:#b3261e; --insuf:#8a5a00; --card:#fff; }
+@media (prefers-color-scheme: dark) { :root { --bg:#141416; --fg:#ececee; --muted:#9b9ba1; --line:#2c2c30; --card:#1c1c1f; --pass:#5cc27a; --fail:#ff7b72; --insuf:#e3b341; } }
+body { background:var(--bg); color:var(--fg); font:15px/1.5 system-ui, -apple-system, Segoe UI, sans-serif; margin:0; }
+main { max-width:1100px; margin:0 auto; padding:24px 16px 80px; }
+h1 { font-size:22px; margin:0 0 4px; } h2 { font-size:17px; margin:32px 0 8px; border-bottom:1px solid var(--line); padding-bottom:4px; }
+.muted { color:var(--muted); } .small { font-size:13px; }
+.verdict { border:2px solid; border-radius:10px; padding:16px 20px; margin:16px 0 8px; background:var(--card); }
+.verdict .tag { font-size:26px; font-weight:700; letter-spacing:.5px; }
+.PASS { border-color:var(--pass); } .PASS .tag { color:var(--pass); }
+.FAIL { border-color:var(--fail); } .FAIL .tag { color:var(--fail); }
+.INSUFFICIENT { border-color:var(--insuf); } .INSUFFICIENT .tag { color:var(--insuf); }
+.warn { border-left:4px solid var(--fail); background:var(--card); padding:8px 12px; margin:8px 0; }
+.note { border-left:4px solid var(--insuf); background:var(--card); padding:8px 12px; margin:8px 0; }
+table { border-collapse:collapse; width:100%; margin:8px 0; background:var(--card); font-variant-numeric:tabular-nums; }
+th, td { border-bottom:1px solid var(--line); padding:6px 8px; text-align:left; font-size:14px; }
+th { color:var(--muted); font-weight:600; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:8px; }
+.kpi { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+.kpi .v { font-size:20px; font-weight:650; } .kpi .k { font-size:12px; color:var(--muted); }
+.fig { background:var(--card); border:1px solid var(--line); border-radius:8px; margin:8px 0; overflow:hidden; }
+.hl { background:rgba(227,179,65,.18); }
+</style>
+<script>{{ plotly_js | safe }}</script>
+</head>
+<body><main>
+<h1>{{ title }}</h1>
+<div class="muted small">{{ subtitle }}</div>
+
+<div class="verdict {{ verdict.css }}">
+  <div class="tag">{{ verdict.status }}</div>
+  <div>{{ verdict.reason }}</div>
+  <div class="muted small" style="margin-top:6px">Trial count used for DSR (from the ledger): <b>{{ n_trials }}</b>. Headline fills: tier 2 (trade-through).</div>
+</div>
+
+{% for w in warnings %}<div class="warn">{{ w }}</div>{% endfor %}
+{% for n in notes %}<div class="note">{{ n }}</div>{% endfor %}
+
+<h2>Key numbers (never read one alone)</h2>
+<div class="grid">
+{% for k in kpis %}<div class="kpi"><div class="v">{{ k.v }}</div><div class="k">{{ k.k }}</div></div>{% endfor %}
+</div>
+
+{% if stages %}
+<h2>Selection funnel</h2>
+<table><tr><th>Stage</th><th>Result</th><th>Why</th></tr>
+{% for s in stages %}<tr><td>{{ s.stage }} {{ s.name }}</td><td><b>{{ s.status }}</b></td><td>{{ s.summary }}</td></tr>{% endfor %}
+</table>
+{% endif %}
+
+<h2>Fill tiers side by side</h2>
+<table><tr><th>Fill model</th><th>Trades</th><th>Net $</th><th>Expectancy $</th><th>Expectancy R</th><th>Sharpe (ann.) ± SE</th></tr>
+{% for t in tiers %}<tr><td>{{ t.label }}</td><td>{{ t.n }}</td><td>{{ t.net }}</td><td>{{ t.exp }}</td><td>{{ t.exp_r }}</td><td>{{ t.sharpe }}</td></tr>{% endfor %}
+</table>
+{% if fill_line %}<div class="warn">{{ fill_line }}</div>{% endif %}
+{% if diag %}<p class="small">Fill-optimism diagnostic (pure random walk, matched intraday volatility): tier 1 net {{ diag.t1 }}, tier 2 net {{ diag.t2 }}. {% if diag.warning %}<b>{{ diag.warning }}</b>{% else %}No profit on noise.{% endif %}</p>{% endif %}
+
+{% for f in figures %}<h2>{{ f.title }}</h2>{% if f.caption %}<p class="small muted">{{ f.caption }}</p>{% endif %}<div class="fig">{{ f.html | safe }}</div>{% endfor %}
+
+{% if wf_rows %}
+<h2>Walk-forward segments (selection rule)</h2>
+<table><tr><th>#</th><th>Train sessions</th><th>Test sessions</th><th>Selected params</th><th>IS mean $/day</th><th>OOS mean $/day</th></tr>
+{% for r in wf_rows %}<tr><td>{{ loop.index }}</td><td>{{ r.train }}</td><td>{{ r.test }}</td><td class="small">{{ r.params }}</td><td>{{ r.is_mean }}</td><td>{{ r.oos_mean }}</td></tr>{% endfor %}
+</table>
+{% endif %}
+
+<h2>Monte Carlo and synthetic nulls</h2>
+<table>{% for r in mc_rows %}<tr><td>{{ r.k }}</td><td>{{ r.v }}</td></tr>{% endfor %}</table>
+
+<h2>Sample size: how many trades does this edge need?</h2>
+<p class="small">Observed expectancy {{ ss.exp_r }} R over {{ ss.n }} trades (stdev {{ ss.sd_r }} R). Required N: {{ ss.req2 }} for t=2, {{ ss.req3 }} for t=3 (the bar when chosen from a family, Harvey-Liu-Zhu 2016). One year of daily data gives SE(annualized Sharpe) &asymp; 1.0.</p>
+<table><tr><th>Expectancy (stdev &asymp; 1R)</th><th>N for t=2</th><th>N for t=3</th></tr>
+{% for r in ss.table %}<tr class="{{ 'hl' if r.here else '' }}"><td>{{ r.e }}</td><td>{{ r.n2 }}</td><td>{{ r.n3 }}</td></tr>{% endfor %}
+</table>
+
+{% if topstep %}
+<h2>Topstep 50K Combine</h2>
+<div class="note">{{ zero_edge_line }}</div>
+<table><tr><th></th><th>This strategy</th><th>Same trades, edge removed</th><th>Every-start historical</th></tr>
+{% for r in topstep %}<tr><td>{{ r.k }}</td><td>{{ r.a }}</td><td>{{ r.b }}</td><td>{{ r.c }}</td></tr>{% endfor %}
+</table>
+<p class="small muted">Sizing: {{ sizing_label }}. Rules version: {{ rules_version }}. {{ rules_note }}</p>
+{% endif %}
+
+<h2>Data and assumptions</h2>
+<ul class="small">{% for a in assumptions %}<li>{{ a }}</li>{% endfor %}</ul>
+<p class="muted small">Generated {{ generated }} by nqlab {{ version }} &middot; run {{ run_id }} &middot; data {{ data_version }}</p>
+</main></body></html>

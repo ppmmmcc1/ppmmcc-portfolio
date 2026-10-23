@@ -76,7 +76,12 @@ class MarketData:
                           self.warnings, self._fresh_meta())
 
     def with_bars(self, bars: pl.DataFrame, data_version: str) -> "MarketData":
-        return MarketData(bars, self.sessions, data_version, self.provenance, self.warnings, self._fresh_meta())
+        """A derived dataset (permuted / synthetic / copy). Real trades never travel with
+        replaced bars: a trades-based profile on permuted bars would leak real structure
+        into the null. Such datasets are flagged ``bars_only``."""
+        meta = {k: v for k, v in self._fresh_meta().items() if k != "trades"}
+        meta["bars_only"] = True
+        return MarketData(bars, self.sessions, data_version, self.provenance, self.warnings, meta)
 
     def _fresh_meta(self) -> dict[str, Any]:
         """Derived datasets never inherit cached features (they were computed on other bars)."""
