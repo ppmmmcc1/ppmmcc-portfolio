@@ -28,6 +28,7 @@ nqlab = ["results/templates/*.j2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-ra -m 'not slow'"
 markers = [
   "slow: long-running statistical tests (null calibration, MCPT)",
