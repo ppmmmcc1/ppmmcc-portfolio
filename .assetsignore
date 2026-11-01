@@ -1,0 +1,11 @@
+# Files Cloudflare should NOT publish as part of the site.
+.git
+.github
+node_modules
+scripts
+supabase
+package.json
+package-lock.json
+README.md
+wrangler.jsonc
+.assetsignore

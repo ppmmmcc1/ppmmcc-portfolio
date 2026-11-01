@@ -44,6 +44,10 @@ const FIELDS = ['slug', 'title', 'subtitle', 'status', 'tags', 'summary', 'why_m
     'how_md', 'problems_md', 'hero_image', 'gallery', 'stl_url', 'specs',
     'published', 'sort_order'];
 
+// Cloudflare Workers refuses to deploy any single static file over 25 MiB.
+const CF_MAX_BYTES = 25 * 1024 * 1024;
+const oversized = [];
+
 const isSupa = (u) => typeof u === 'string' && u.includes('supabase.co/storage');
 const extOf = (u) => {
     const m = u.split('?')[0].split('#')[0].match(/\.([a-z0-9]{2,5})$/i);
@@ -58,6 +62,9 @@ async function localize(url, relPath) {
     mkdirSync(dirname(p(relPath)), { recursive: true });
     writeFileSync(p(relPath), buf);
     console.log(`  ↓ ${relPath}  (${(buf.length / 1024).toFixed(0)} KB)`);
+    if (buf.length > CF_MAX_BYTES) {
+        oversized.push(`${relPath} (${(buf.length / 1048576).toFixed(1)} MB)`);
+    }
     return '/' + relPath.split('\\').join('/');
 }
 
@@ -113,4 +120,10 @@ writeFileSync(p('data', 'projects.json'), JSON.stringify(clean, null, 2) + '\n')
 
 const withModels = clean.filter((r) => r.stl_url).length;
 console.log(`\n✓ Wrote data/projects.json — ${clean.length} projects, ${withModels} with 3D models.`);
+if (oversized.length) {
+    console.error('\n✗ These files are over Cloudflare\'s 25 MB per-file limit, so the site WILL NOT deploy until they are smaller:');
+    oversized.forEach((f) => console.error('    ' + f));
+    console.error('  Shrink them first (e.g. decimate the mesh in your slicer/CAD, or compress the video), re-upload in the admin, and sync again.');
+    process.exit(1);
+}
 console.log('  Next:  git add -A && git commit -m "Update projects" && git push');
