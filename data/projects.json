@@ -18,7 +18,7 @@
     ],
     "stl_url": null,
     "specs": [],
-    "published": true,
+    "published": false,
     "sort_order": 0
   },
   {
@@ -52,51 +52,55 @@
     ],
     "stl_url": null,
     "specs": [],
-    "published": true,
+    "published": false,
     "sort_order": 0
   },
   {
     "slug": "3-axis-robot-arm",
     "title": "3-Axis Robot Arm",
-    "subtitle": "A servo-driven arm with a rack-and-pinion gripper, built as team lead in a 6-week robotics class",
+    "subtitle": "A sub-$40 servo arm with my own control app, built for a summer robotics class",
     "status": "project",
     "tags": [
       "Robotics",
-      "Arduino",
+      "ESP32",
       "FEA",
-      "Mechanism Design"
+      "Software"
     ],
-    "summary": "A 3-axis servo arm with a potentiometer control box, a rack-and-pinion gripper, and a proximity sensor on the gripper for object detection.",
-    "why_md": "I was tasked with taking the CAD and coding skills I'd sharpened in a 6-week robotics class and using them to bring a project to life. I was the project lead, in charge of the overall design and features, while my teammate owned wiring, component selection, and code. After digging through past students' projects, we landed on a servo-powered robotic arm that would follow a leader arm. At first we wanted six axes of freedom, but we cut it down to three because of time and because the servos' stall torque was pretty low.",
-    "how_md": "**Gripper gears.** After some research, the easy route was a lever arm on a servo that pushes a single gripper jaw, or one rigid jaw and one moving one. I wanted a challenge and a chance to level up my design skills, so I went with rack and pinion. I used a Python script to generate a gear to my exact specs, then designed a rack that meshed with it perfectly. Small dovetail tracks guide the gripper racks, which keeps the grease where it belongs and cuts down on how much the jaws wiggle.\n\n**Joint 1 housing.** The servos are rated for about 2 kg of stall load, so every gram counted. I used fillets and cutouts strategically to take stress off the motors and raise how much the arm can actually lift. To keep weight down and make assembly easier, the gripper housing attaches to J1 with a single screw, using a trick I picked up at an internship: a nut hidden inside the J1 housing.\n\n**Main arm.** The arm linking the gripper assembly to the second joint in the base started as a plain rectangle with holes for the servos. I wanted it to hold well over the servos' 2 kg stall load, and a SolidWorks simulation showed the solid rectangle was actually weaker than a version where I pulled material out so the arm works like an I-beam, the same shape holding up buildings all over the world.\n\n**Wire management.** Any multi-axis robot ends up with a mess of wires, and bending, pulling, or snagging one can take the whole thing down. There are 15 separate wires running from the gripper to the base alone. I added slots for the wires to sit in with zip-tie routing, a hole in the second joint housing that lines up with a hole in the top of the base so wires drop straight through to the Arduino, and a circular cutout so the potentiometer wires can reach the board.",
-    "problems_md": "**Correct tolerancing in assemblies = one-shot designs.** A mentor told me that once, and this project proved it. As long as the mates are set up properly, an assembly gives you a really precise picture of how parts will interact in real life.\n\nThe other lesson: think big, work hard, and only cut features when you absolutely have to. The original plan was a 6-axis arm driven by a leader arm. Between time limits, life, and honestly a lazy day or two, it ended up at 3 axes, the leader arm became a control box, and the built-in universal clamp got swapped for one I use for car repair. Next time I'm protecting the scope.",
+    "summary": "A 3-axis direct-drive servo arm that lifts 1–2 kg for under $40, with a rack-and-pinion gripper, a potentiometer control panel, and a control app I wrote myself.",
+    "why_md": "This was the final project for a summer robotics class: take the CAD and coding skills from the course and build something real. It was a two-person project. I took the mechanical side and my partner took the software, and after looking through past students' work we landed on a servo-driven robotic arm.\n\nWe originally pictured six axes following a leader arm, but with only a week or two for the whole build, and servos with limited stall torque, I scoped it to three axes and a potentiometer control panel. In the end I built the whole robot and wrote all of the software myself.",
+    "how_md": "**Direct drive.** Every joint is driven straight off a servo, with no gearboxes or belts. That kept it light, cheap, and fast to build on a tight deadline. The full arm cost under $40 and lifts around 1 to 2 kg.\n\n**Gripper.** The easy routes were a servo lever pushing one jaw, or one fixed jaw and one moving one. I wanted the challenge, so I went rack and pinion. I used a Python script to generate a gear to my exact specs, then designed racks that mesh with it. Small dovetail tracks guide the racks, which keeps the grease where it belongs and cuts down on jaw wobble. It was the hardest part to design, and it came out really nice.\n\n**Joint 1 housing.** With servos rated around 2 kg of stall load, every gram counts. I used fillets and cutouts to take load off the motors, and the gripper housing attaches with a single screw into a nut hidden inside J1, a trick I picked up at an internship.\n\n**Main arm.** It started as a plain rectangle with servo holes. I ran FEA in SolidWorks, and the solid bar was actually weaker than a version where I pulled material out so the arm acts like an I-beam. The result was lighter and stronger.\n\n**Wiring.** There are 15 separate wires running from the gripper to the base alone. Slots with zip-tie routing hold them in place, aligned holes drop them through the joint and base to the ESP32, and a cutout feeds the potentiometer panel, so nothing snags or pulls when the arm moves.\n\n**Software.** An ESP32 runs the servos. I wrote the firmware plus a control app that shows each motor's live angle, sets joint limits so the arm can't drive into itself, and is laying the groundwork for saved positions. The potentiometer panel connects through the same system for hands-on control.",
+    "problems_md": "**The hardest part was the software.** I'm a mechanical person, and the design came easy. Writing the firmware and the control app by myself, in about half a week, was the real fight. I got it done, the arm worked, and the project got an A.\n\n**Correct tolerancing in assemblies = one-shot designs.** A mentor told me that once, and this project proved it. With the mates set up properly, the assembly told me exactly how the parts would fit before I printed anything.\n\n**What's next.** I work a lot of security shifts, so I'm often away when a print finishes, and the next print can't start until someone clears the bed. The plan is to put a Raspberry Pi camera on the arm, run a small computer-vision model, and turn it into a 3D-printer assistant that pulls finished parts and keeps the queue moving.",
     "hero_image": "/assets/uploads/3-axis-robot-arm-hero.jpg",
     "gallery": [],
     "stl_url": "/assets/models/3-axis-robot-arm.stl",
     "specs": [
       {
         "label": "Axes",
-        "value": "3"
+        "value": "3, direct drive"
       },
       {
-        "label": "Actuation",
-        "value": "Servos (~2 kg stall)"
+        "label": "Payload",
+        "value": "~1–2 kg"
+      },
+      {
+        "label": "Cost",
+        "value": "Under $40"
+      },
+      {
+        "label": "Controller",
+        "value": "ESP32"
       },
       {
         "label": "Control",
-        "value": "Arduino + potentiometer box"
+        "value": "Custom app + potentiometer panel"
       },
       {
         "label": "Gripper",
         "value": "Rack & pinion, dovetail-guided"
       },
       {
-        "label": "Sensing",
-        "value": "Proximity sensor on gripper"
-      },
-      {
-        "label": "Role",
-        "value": "Project lead, 2-person team"
+        "label": "Result",
+        "value": "A"
       }
     ],
     "published": true,
@@ -151,24 +155,79 @@
       }
     ],
     "published": true,
-    "sort_order": 2
+    "sort_order": 3
   },
   {
     "slug": "nu-vu-passport-cover",
     "title": "NU/VU Passport Cover",
-    "subtitle": "",
+    "subtitle": "Client work for a UK fashion brand: from a napkin sketch to a printed TPU product, plus two follow-up pieces",
     "status": "project",
-    "tags": [],
-    "summary": "",
-    "why_md": "",
-    "how_md": "",
-    "problems_md": "",
-    "hero_image": "/assets/uploads/nu-vu-passport-cover-hero.jpg",
-    "gallery": [],
+    "tags": [
+      "Client Work",
+      "Product Design",
+      "TPU",
+      "Design for Printing"
+    ],
+    "summary": "A UK fashion brand asked me to turn a napkin sketch into a real passport cover. I designed it in TPU to print without support material, and they came back for two more pieces.",
+    "why_md": "NU/VU is a UK-based fashion brand, and they reached out to me with a napkin sketch: a passport cover for their loyalty program. They needed it to actually protect a passport and look good doing it, because it was going to be the face of the program when they launched it. That turned into my first real client project, and it went well enough that they came back for two more: a **Broken Edition** of the cover and a matching **luggage tag**.",
+    "how_md": "**Material.** I printed it in TPU. A passport cover has to flex open and closed every day without cracking, and the rubbery feel fits the brand. I also wanted to keep filament waste down, so I designed the features so the part supports itself. Nothing gets printed just to be thrown away.\n\n**Two major revisions.** The first was about retention: making sure the passport stays put and doesn't slide out. The second was about wall thickness: thick enough that the cover holds its shape and protects the pages, thin enough that it still feels like a cover and not a brick.\n\n**Follow-up pieces.** The Broken Edition keeps the raised NU/VU emblem but breaks the edges apart on purpose so they look crumbled. The luggage tag carries the same branding on the front, with Name, Nationality, and Traveling For fields on the back.",
+    "problems_md": "This was my first time printing TPU, and it fought me. I had to recalibrate my machine for a soft, stringy filament, and I had to unlearn some habits too. I'm used to PETG and PLA, where a thin feature holds its shape, and TPU just doesn't. A few design choices had to change to work with a softer plastic instead of against it.\n\nThe bigger win was the client side: taking someone else's rough idea, turning it into something they could hold and launch, and having them trust me enough to come back twice.",
+    "hero_image": "/assets/uploads/nu-vu-passport-cover-broken-edition-hero.jpg",
+    "gallery": [
+      {
+        "url": "/assets/uploads/nu-vu-passport-cover-broken-edition-gallery-2.jpg",
+        "alt": "Early sketch of the fold-open passport cover"
+      },
+      {
+        "url": "/assets/uploads/nu-vu-passport-cover-hero.jpg",
+        "alt": "Original NU/VU passport cover printing in TPU"
+      },
+      {
+        "url": "/assets/uploads/nu-vu-passport-cover-broken-edition-gallery-1.jpg",
+        "alt": "Broken Edition passport cover in hand"
+      },
+      {
+        "url": "/assets/uploads/nu-vu-luggage-tag-hero.jpg",
+        "alt": "NU/VU luggage tag, front"
+      },
+      {
+        "url": "/assets/uploads/nu-vu-luggage-tag-gallery-1.jpg",
+        "alt": "NU/VU luggage tag, back with name, nationality, and travel fields"
+      },
+      {
+        "url": "/assets/uploads/nu-vu-passport-cover-broken-edition-gallery-3.png",
+        "alt": "NU/VU loyalty program launch post"
+      },
+      {
+        "url": "/assets/uploads/nu-vu-passport-cover-broken-edition-gallery-4.png",
+        "alt": "NU/VU premium economy passport launch post"
+      }
+    ],
     "stl_url": null,
-    "specs": [],
+    "specs": [
+      {
+        "label": "Client",
+        "value": "NU/VU (UK fashion brand)"
+      },
+      {
+        "label": "Material",
+        "value": "TPU"
+      },
+      {
+        "label": "Supports",
+        "value": "None, self-supporting"
+      },
+      {
+        "label": "Major revisions",
+        "value": "2"
+      },
+      {
+        "label": "Deliverables",
+        "value": "Cover, Broken Edition, luggage tag"
+      }
+    ],
     "published": true,
-    "sort_order": 2
+    "sort_order": 0
   },
   {
     "slug": "raspberry-pi-laptop",
@@ -215,7 +274,7 @@
       }
     ],
     "published": true,
-    "sort_order": 3
+    "sort_order": 4
   },
   {
     "slug": "valve-cover",
@@ -258,7 +317,7 @@
       }
     ],
     "published": true,
-    "sort_order": 3
+    "sort_order": 2
   },
   {
     "slug": "carbon-filter-fume-extractor",
@@ -298,7 +357,7 @@
       }
     ],
     "published": true,
-    "sort_order": 4
+    "sort_order": 5
   },
   {
     "slug": "octopi-laptop-enclosure",
@@ -318,7 +377,7 @@
     "stl_url": null,
     "specs": [],
     "published": true,
-    "sort_order": 5
+    "sort_order": 6
   },
   {
     "slug": "filament-recycler",
