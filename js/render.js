@@ -176,6 +176,9 @@
         var media = [];
         if (p.hero_image) { media.push({ url: p.hero_image, alt: p.title }); }
         media = media.concat(p.gallery || []);
+        // Skip anything already shown inline in the story text.
+        var story = [p.why_md, p.how_md, p.problems_md].join('\n');
+        media = media.filter(function (it) { return it && it.url && story.indexOf('(' + it.url + ')') === -1; });
         var gallery = galleryHtml(media);
 
         // Order for every project/concept: header → 3D model → story text →
@@ -209,14 +212,30 @@
     function galleryHtml(gallery) {
         var g = gallery || [];
         if (!g.length) { return ''; }
-        var cls = g.length === 1 ? 'gallery single' : 'gallery';
+        // Videos lead the gallery and span the full width; images follow.
+        g = g.filter(isVideo).concat(g.filter(function (it) { return !isVideo(it); }));
+        var images = g.filter(function (it) { return !isVideo(it); }).length;
+        var cls = images <= 1 ? 'gallery single' : 'gallery';
         var figs = g.map(function (it) {
-            return '<figure data-reveal><img src="' + attr(it.url) + '" alt="' + attr(it.alt || '') + '" loading="lazy"></figure>';
+            return '<figure data-reveal' + (isVideo(it) ? ' class="is-video"' : '') + '>' + mediaTag(it) + '</figure>';
         }).join('');
         return '<section class="gallery-block" data-reveal>' +
             '<h2 class="gallery-title"><span class="dot"></span>Gallery</h2>' +
             '<div class="' + cls + '">' + figs + '</div>' +
         '</section>';
+    }
+
+    // A gallery item is a video if it says so, or if its URL ends in a video extension.
+    function isVideo(it) {
+        if (!it || !it.url) { return false; }
+        return it.type === 'video' || /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(it.url);
+    }
+    function mediaTag(it) {
+        if (isVideo(it)) {
+            return '<video src="' + attr(it.url) + '" controls playsinline preload="metadata"' +
+                (it.alt ? ' aria-label="' + attr(it.alt) + '"' : '') + '></video>';
+        }
+        return '<img src="' + attr(it.url) + '" alt="' + attr(it.alt || '') + '" loading="lazy">';
     }
 
     function cadHtml(url, title) {
@@ -264,11 +283,27 @@
     }
     function attr(s) { return esc(s).replace(/"/g, '&quot;'); }
 
-    // markdown-lite: paragraphs, **bold**, and "- " bullet lists
+    // markdown-lite: paragraphs, **bold**, "- " bullet lists, "### " sub-headings,
+    // and media lines "![caption](url)" (images or videos; consecutive lines form a row).
+    var MEDIA_LINE = /^\s*!\[([^\]]*)\]\(([^)\s]+)\)\s*$/;
     function mdToHtml(md) {
         var blocks = String(md).replace(/\r\n/g, '\n').split(/\n{2,}/);
         return blocks.map(function (b) {
             var lines = b.split('\n');
+            var head = /^\s*#{2,4}\s+(.+)$/.exec(lines[0]);
+            if (head) {
+                var rest = lines.slice(1).join('\n').trim();
+                return '<h3 class="prose-h">' + inline(head[1]) + '</h3>' + (rest ? mdToHtml(rest) : '');
+            }
+            var media = lines.filter(function (l) { return l.trim(); });
+            if (media.length && media.every(function (l) { return MEDIA_LINE.test(l); })) {
+                var figs = media.map(function (l) {
+                    var m = MEDIA_LINE.exec(l);
+                    var it = { url: m[2], alt: m[1] };
+                    return '<figure>' + mediaTag(it) + (m[1] ? '<figcaption>' + esc(m[1]) + '</figcaption>' : '') + '</figure>';
+                });
+                return '<div class="prose-media' + (figs.length > 1 ? ' multi' : '') + '">' + figs.join('') + '</div>';
+            }
             var isList = lines.every(function (l) { return /^\s*[-*]\s+/.test(l) || !l.trim(); });
             if (isList && /[-*]\s+/.test(b)) {
                 var lis = lines.filter(function (l) { return l.trim(); })

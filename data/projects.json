@@ -160,7 +160,7 @@
   {
     "slug": "nu-vu-passport-cover",
     "title": "NU/VU Passport Cover",
-    "subtitle": "Client work for a UK fashion brand: from a napkin sketch to a printed TPU product, plus two follow-up pieces",
+    "subtitle": "Three separate projects for a UK fashion brand that kept coming back: the passport cover, its Broken Edition, and a matching luggage tag",
     "status": "project",
     "tags": [
       "Client Work",
@@ -168,9 +168,9 @@
       "TPU",
       "Design for Printing"
     ],
-    "summary": "A UK fashion brand asked me to turn a napkin sketch into a real passport cover. I designed it in TPU to print without support material, and they came back for two more pieces.",
-    "why_md": "NU/VU is a UK-based fashion brand, and they reached out to me with a napkin sketch: a passport cover for their loyalty program. They needed it to actually protect a passport and look good doing it, because it was going to be the face of the program when they launched it. That turned into my first real client project, and it went well enough that they came back for two more: a **Broken Edition** of the cover and a matching **luggage tag**.",
-    "how_md": "**Material.** I printed it in TPU. A passport cover has to flex open and closed every day without cracking, and the rubbery feel fits the brand. I also wanted to keep filament waste down, so I designed the features so the part supports itself. Nothing gets printed just to be thrown away.\n\n**Two major revisions.** The first was about retention: making sure the passport stays put and doesn't slide out. The second was about wall thickness: thick enough that the cover holds its shape and protects the pages, thin enough that it still feels like a cover and not a brick.\n\n**Follow-up pieces.** The Broken Edition keeps the raised NU/VU emblem but breaks the edges apart on purpose so they look crumbled. The luggage tag carries the same branding on the front, with Name, Nationality, and Traveling For fields on the back.",
+    "summary": "A UK fashion brand hired me to turn a napkin sketch into a TPU passport cover, then came back two more times: for a Broken Edition and a luggage tag.",
+    "why_md": "NU/VU is a UK-based fashion brand. They reached out to me with a napkin sketch of a passport cover for their loyalty program, something that would actually protect a passport and look good doing it. That first job went well enough that they came back, and then came back again. Three separate projects from one client:\n\n- **Project 01 · Passport Cover:** napkin sketch to a printed TPU product\n- **Project 02 · Broken Edition:** a deliberately crumbled take on the cover\n- **Project 03 · Luggage Tag:** a matching tag to go with it",
+    "how_md": "### Project 01 · Passport Cover\n\n![The napkin-sketch concept: a fold-open cover with corner pockets](/assets/uploads/nu-vu-passport-cover-broken-edition-gallery-2.jpg)\n\n**Material.** I printed it in TPU. A passport cover has to flex open and closed every day without cracking, and the rubbery feel fits the brand. I also wanted to keep filament waste down, so I designed the features so the part supports itself. Nothing gets printed just to be thrown away.\n\n**Two major revisions.** The first was about retention: making sure the passport stays put and doesn't slide out. The second was about wall thickness: thick enough that the cover holds its shape and protects the pages, thin enough that it still feels like a cover and not a brick.\n\n![Printing the cover in TPU](/assets/uploads/nu-vu-passport-cover-hero.jpg)\n\nNU/VU launched it as the face of their loyalty program.\n\n![NU/VU loyalty program launch post](/assets/uploads/nu-vu-passport-cover-broken-edition-gallery-3.png)\n![Premium economy tier launch post](/assets/uploads/nu-vu-passport-cover-broken-edition-gallery-4.png)\n\n### Project 02 · Broken Edition\n\nThey came back for a second version: the same raised NU/VU emblem and lettering, with the edges broken apart on purpose so they look crumbled.\n\n![Broken Edition cover in hand](/assets/uploads/nu-vu-passport-cover-broken-edition-hero.jpg)\n![Broken Edition, front detail](/assets/uploads/nu-vu-passport-cover-broken-edition-gallery-1.jpg)\n\n### Project 03 · Luggage Tag\n\nThe third time, they wanted a luggage tag to match: NU/VU branding on the front with the same broken edges, and Name, Nationality, and Traveling For fields on the back.\n\n![Luggage tag, front](/assets/uploads/nu-vu-luggage-tag-hero.jpg)\n![Luggage tag, back](/assets/uploads/nu-vu-luggage-tag-gallery-1.jpg)",
     "problems_md": "This was my first time printing TPU, and it fought me. I had to recalibrate my machine for a soft, stringy filament, and I had to unlearn some habits too. I'm used to PETG and PLA, where a thin feature holds its shape, and TPU just doesn't. A few design choices had to change to work with a softer plastic instead of against it.\n\nThe bigger win was the client side: taking someone else's rough idea, turning it into something they could hold and launch, and having them trust me enough to come back twice.",
     "hero_image": "/assets/uploads/nu-vu-passport-cover-broken-edition-hero.jpg",
     "gallery": [
@@ -210,20 +210,16 @@
         "value": "NU/VU (UK fashion brand)"
       },
       {
-        "label": "Material",
-        "value": "TPU"
+        "label": "Projects",
+        "value": "3, repeat client"
       },
       {
-        "label": "Supports",
-        "value": "None, self-supporting"
+        "label": "Cover material",
+        "value": "TPU, self-supporting"
       },
       {
-        "label": "Major revisions",
+        "label": "Cover revisions",
         "value": "2"
-      },
-      {
-        "label": "Deliverables",
-        "value": "Cover, Broken Edition, luggage tag"
       }
     ],
     "published": true,

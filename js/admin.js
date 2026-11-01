@@ -11,6 +11,7 @@
     var root, bar, toastEl;
     var BUCKET_IMG = (window.SUPA_CONFIG && window.SUPA_CONFIG.imagesBucket) || 'images';
     var BUCKET_STL = (window.SUPA_CONFIG && window.SUPA_CONFIG.modelsBucket) || 'models';
+    var MAX_VIDEO_MB = 50; // Supabase free-plan per-file upload limit
 
     // transient state for the editor's uploaded media
     var ed = blankMedia();
@@ -234,6 +235,8 @@
                     field(labelFor(p.status, 0), '<textarea class="textarea" id="f-why">' + esc(p.why_md) + '</textarea>') +
                     field(labelFor(p.status, 1), '<textarea class="textarea" id="f-how">' + esc(p.how_md) + '</textarea>') +
                     field(labelFor(p.status, 2), '<textarea class="textarea" id="f-problems">' + esc(p.problems_md) + '</textarea>') +
+                    '<span class="hint">Formatting: blank line = new paragraph · **bold** · “- ” bullets · “### Heading” starts a sub-section · ' +
+                        '“![caption](url)” on its own line shows an image or video inline (copy a URL with “copy link” under a gallery thumbnail).</span>' +
                 '</div>' +
                 '<div class="panel">' +
                     '<h2>Settings</h2>' +
@@ -254,8 +257,9 @@
                     '<div class="field"><span class="field-label">Hero image</span>' +
                         '<div class="dropzone" id="hero-drop">Click or drop an image</div>' +
                         '<div class="thumbs" id="hero-thumb"></div></div>' +
-                    '<div class="field"><span class="field-label">Gallery images</span>' +
-                        '<div class="dropzone" id="gal-drop">Click or drop images</div>' +
+                    '<div class="field"><span class="field-label">Gallery images &amp; videos</span>' +
+                        '<div class="dropzone" id="gal-drop">Click or drop images or videos</div>' +
+                        '<span class="hint">Videos: MP4 (H.264) plays everywhere. iPhone .MOV files may not play in every browser; export as MP4 / “Most Compatible”. Max ' + MAX_VIDEO_MB + ' MB per file on the free plan.</span>' +
                         '<div class="thumbs" id="gal-thumbs"></div></div>' +
                     '<div class="field"><span class="field-label">3D model (optional)</span>' +
                         '<div class="dropzone" id="stl-drop">Click or drop a model — STL, GLB, glTF, OBJ, 3MF</div>' +
@@ -285,7 +289,20 @@
 
         // uploads
         wireDrop('hero-drop', 'image/*', false, function (files) { uploadImages(files.slice(0, 1), BUCKET_IMG, function (urls) { ed.hero_image = urls[0]; renderHeroThumb(); }); });
-        wireDrop('gal-drop', 'image/*', true, function (files) { uploadImages(files, BUCKET_IMG, function (urls) { urls.forEach(function (u) { ed.gallery.push({ url: u, alt: '' }); }); renderGalThumbs(); }); });
+        wireDrop('gal-drop', 'image/*,video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v', true, function (files) {
+            files = files.filter(function (f) {
+                if (isVideoName(f.name) && f.size > MAX_VIDEO_MB * 1024 * 1024) {
+                    toast(f.name + ' is over ' + MAX_VIDEO_MB + ' MB. Compress it (e.g. HandBrake “Fast 1080p30”) and try again.', true);
+                    return false;
+                }
+                return true;
+            });
+            if (!files.length) { return; }
+            uploadImages(files, BUCKET_IMG, function (urls) {
+                urls.forEach(function (u) { ed.gallery.push(isVideoName(u) ? { url: u, alt: '', type: 'video' } : { url: u, alt: '' }); });
+                renderGalThumbs();
+            });
+        });
         wireDrop('stl-drop', '.stl,.glb,.gltf,.obj,.3mf,model/stl,model/gltf-binary', false, function (files) { uploadStl(files[0]); });
 
         renderHeroThumb(); renderGalThumbs(); renderStlPill();
@@ -321,7 +338,16 @@
     }
     function renderGalThumbs() {
         var box = document.getElementById('gal-thumbs');
-        box.innerHTML = ed.gallery.map(function (g, i) { return thumbHtml(g.url, i); }).join('');
+        box.innerHTML = ed.gallery.map(function (g, i) { return thumbHtml(g.url, i, true); }).join('');
+        Array.prototype.forEach.call(box.querySelectorAll('[data-copy]'), function (a) {
+            a.addEventListener('click', function (e) {
+                e.preventDefault();
+                var md = '![](' + a.getAttribute('data-copy') + ')';
+                (navigator.clipboard ? navigator.clipboard.writeText(md) : Promise.reject()).then(
+                    function () { toast('Copied ' + md.slice(0, 40) + '… paste it on its own line in the text'); },
+                    function () { window.prompt('Copy this into the text:', md); });
+            });
+        });
         Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) {
             b.addEventListener('click', function () { ed.gallery.splice(parseInt(b.dataset.i, 10), 1); renderGalThumbs(); });
         });
@@ -332,9 +358,16 @@
         box.innerHTML = '<span class="file-pill">' + esc(fileName(ed.stl_url)) + ' <button type="button">remove</button></span>';
         box.querySelector('button').addEventListener('click', function () { ed.stl_url = ''; renderStlPill(); });
     }
-    function thumbHtml(url, i) {
-        return '<div class="thumb"><img src="' + attr(url) + '" alt=""><button type="button" data-i="' + i + '" aria-label="Remove">×</button></div>';
+    function thumbHtml(url, i, copyable) {
+        var media = isVideoName(url)
+            ? '<video src="' + attr(url) + '" muted playsinline preload="metadata"></video>'
+            : '<img src="' + attr(url) + '" alt="">';
+        return '<div class="thumb">' + media +
+            '<button type="button" data-i="' + i + '" aria-label="Remove">×</button>' +
+            (copyable ? '<a href="#" class="thumb-copy" data-copy="' + attr(url) + '">copy link</a>' : '') +
+        '</div>';
     }
+    function isVideoName(s) { return /\.(mp4|webm|mov|m4v)(?:[?#]|$)/i.test(String(s || '')); }
 
     /* ---------------- uploads ---------------- */
     function wireDrop(id, accept, multiple, done) {
